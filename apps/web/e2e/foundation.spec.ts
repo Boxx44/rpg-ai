@@ -70,6 +70,7 @@ test('Alice se cadastra, vê o painel vazio e cria uma campanha', async ({ page 
 
   await expect(page.getByTestId('campaign-title')).toHaveText(CAMPAIGN);
   campaignUrl = page.url();
+  await page.getByRole('link', { name: 'Gerenciar' }).click();
   await expect(page.getByTestId('members-list')).toContainText(alice.name);
 });
 
@@ -80,6 +81,7 @@ test('Alice gera um link de convite', async ({ page }) => {
   await page.getByRole('button', { name: 'Entrar', exact: true }).click();
   await expect(page).toHaveURL(/\/dashboard/);
   await page.getByTestId('campaign-card').filter({ hasText: CAMPAIGN }).click();
+  await page.getByRole('link', { name: 'Gerenciar' }).click();
   await page.getByRole('button', { name: 'Gerar link' }).click();
   inviteLink = await page.getByTestId('invite-link').inputValue();
   expect(inviteLink).toMatch(/\/invite\/[A-Za-z0-9_-]{43}$/);
@@ -96,6 +98,7 @@ test('Bob abre o convite, cria conta e entra na campanha', async ({ page }) => {
   await expect(page.getByRole('heading', { name: 'Você foi convocado' })).toBeVisible();
   await page.getByRole('button', { name: 'Aceitar convite' }).click();
   await expect(page.getByTestId('campaign-title')).toHaveText(CAMPAIGN);
+  await page.getByRole('link', { name: 'Membros' }).click();
   await expect(page.getByTestId('members-list')).toContainText(alice.name);
   await expect(page.getByTestId('members-list')).toContainText(bob.name);
   // Jogador não vê painéis de gestão

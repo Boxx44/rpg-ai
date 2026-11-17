@@ -13,7 +13,11 @@ import { CampaignsController, InvitationsController } from './modules/campaigns.
 import { CampaignsService } from './modules/campaigns.service';
 import { HealthController } from './modules/health.controller';
 import { MeController } from './modules/me.controller';
-import { RealtimeGateway } from './modules/realtime.gateway';
+import { CharactersController, CharactersService } from './modules/characters';
+import { ChatController, ChatService } from './modules/chat';
+import { MapsController, MapsService } from './modules/maps';
+import { NpcsController, NpcsService } from './modules/npcs';
+import { Realtime, RealtimeGateway } from './modules/realtime.gateway';
 
 export interface AppDeps {
   config: AppConfig;
@@ -27,7 +31,16 @@ export class AppModule implements NestModule {
   static register(deps: AppDeps): DynamicModule {
     return {
       module: AppModule,
-      controllers: [HealthController, MeController, CampaignsController, InvitationsController],
+      controllers: [
+        HealthController,
+        MeController,
+        CampaignsController,
+        InvitationsController,
+        ChatController,
+        CharactersController,
+        NpcsController,
+        MapsController,
+      ],
       providers: [
         { provide: APP_CONFIG, useValue: deps.config },
         { provide: DB, useValue: deps.db },
@@ -37,6 +50,11 @@ export class AppModule implements NestModule {
         AuthService,
         CampaignsService,
         RealtimeGateway,
+        Realtime,
+        ChatService,
+        CharactersService,
+        NpcsService,
+        MapsService,
         { provide: APP_GUARD, useClass: AuthGuard },
         { provide: APP_GUARD, useClass: RateLimitGuard },
         { provide: APP_FILTER, useClass: GlobalExceptionFilter },

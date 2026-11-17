@@ -17,6 +17,7 @@ import { forbidden, notFound } from '../common/errors';
 import type { RequestCtx } from '../common/http';
 import { DB } from '../common/tokens';
 import { audit } from './audit';
+import { Realtime } from './realtime.gateway';
 
 const c = schema.campaigns;
 const m = schema.campaignMembers;
@@ -26,7 +27,10 @@ export const hashToken = (t: string) => createHash('sha256').update(t).digest('h
 
 @Injectable()
 export class CampaignsService {
-  constructor(@Inject(DB) private readonly db: Database) {}
+  constructor(
+    @Inject(DB) private readonly db: Database,
+    private readonly rt: Realtime,
+  ) {}
 
   // ───────────── leitura ─────────────
   private async fetchCampaigns(tx: Tx, userId: string, id?: string): Promise<CampaignDto[]> {
@@ -172,8 +176,14 @@ export class CampaignsService {
     });
   }
 
-  updateMember(userId: string, id: string, targetId: string, input: UpdateMemberInput, ctx: RequestCtx) {
-    return withUser(this.db, userId, async (tx) => {
+  async updateMember(
+    userId: string,
+    id: string,
+    targetId: string,
+    input: UpdateMemberInput,
+    ctx: RequestCtx,
+  ) {
+    await withUser(this.db, userId, async (tx) => {
       const myRole = await this.requireRole(tx, userId, id, true);
       const target = await this.roleOf(tx, targetId, id);
       if (!target) throw notFound('Membro');
@@ -193,10 +203,12 @@ export class CampaignsService {
         after: { role: input.role },
       });
     });
+    // Papel mudou: o usuário sai das salas em tempo real e reentra com as permissões novas.
+    await this.rt.resetMembership(id, targetId);
   }
 
-  removeMember(userId: string, id: string, targetId: string, ctx: RequestCtx) {
-    return withUser(this.db, userId, async (tx) => {
+  async removeMember(userId: string, id: string, targetId: string, ctx: RequestCtx) {
+    await withUser(this.db, userId, async (tx) => {
       const myRole = await this.requireRole(tx, userId, id);
       const target = await this.roleOf(tx, targetId, id);
       if (!target) throw notFound('Membro');
@@ -215,6 +227,7 @@ export class CampaignsService {
         before: { role: target },
       });
     });
+    await this.rt.resetMembership(id, targetId);
   }
 
   // ───────────── convites ─────────────

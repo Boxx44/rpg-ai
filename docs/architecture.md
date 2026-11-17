@@ -243,7 +243,9 @@ A IA **não tem** ferramenta de SQL, de editar ficha livremente ou de ler dados 
 
 ## 7.1 Estado após a Fase 1
 
-Existem hoje: `apps/web`, `apps/api`, `packages/{db,shared,ui,logger}`, `tools/`. Os demais diretórios (`apps/worker`, `rules-dsl`, `rules-engine`, `system-model`, `ai`) são criados nas fases correspondentes.
+Existem hoje: `apps/web`, `apps/api`, `packages/{db,shared,ui,logger,rules-engine}`, `tools/`. O `rules-engine` já contém o motor de dados (notação segura: `2d6+3`, `4d6kh3`, `3d6!`, `4dF`, limites contra abuso, gerador injetável). Os demais diretórios (`apps/worker`, `rules-dsl`, `system-model`, `ai`) são criados nas fases correspondentes.
+
+**Mesa de jogo (tempo real):** o navegador conecta ao namespace `/realtime` com o token, entra na sala `c:<campanha>` (mestres também em `c:<campanha>:gm`). Ações vão pela API REST; a API grava no banco e distribui o evento para a sala certa (`chat.message`, `token.moved`, `maps.changed`, `npcs.changed`, `characters.changed`). Ao reconectar, o cliente busca o que perdeu (`GET /messages?after=`).
 
 **Fluxo de autenticação implementado:** o navegador faz login no Supabase Auth → recebe um token (JWT) → envia o token à API → a API verifica a assinatura (segredo HS256 ou chaves públicas JWKS) → confirma que a conta existe e está ativa → executa a consulta no banco com o papel do usuário (RLS ativo).
 

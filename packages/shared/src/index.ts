@@ -153,3 +153,4 @@ export interface ApiErrorBody {
 export function canManageCampaign(role: CampaignRole | null | undefined): boolean {
   return role != null && MANAGER_ROLES.includes(role);
 }
+export * from './game';

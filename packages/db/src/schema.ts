@@ -2,7 +2,17 @@
  * Drizzle schema — espelho tipado das tabelas criadas pelas migrations SQL em /migrations.
  * As migrations SQL são a fonte da verdade (incluem RLS, funções e triggers).
  */
-import { bigint, boolean, jsonb, pgTable, primaryKey, text, timestamp, uuid } from 'drizzle-orm/pg-core';
+import {
+  bigint,
+  boolean,
+  integer,
+  jsonb,
+  pgTable,
+  primaryKey,
+  text,
+  timestamp,
+  uuid,
+} from 'drizzle-orm/pg-core';
 
 const ts = (name: string) => timestamp(name, { withTimezone: true, mode: 'date' });
 
@@ -99,5 +109,104 @@ export const auditLogs = pgTable('audit_logs', {
   after: jsonb('after'),
   requestId: text('request_id'),
   ipHash: text('ip_hash'),
+  createdAt: ts('created_at').notNull().defaultNow(),
+});
+
+export const characters = pgTable('characters', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  campaignId: uuid('campaign_id').notNull(),
+  ownerId: uuid('owner_id').notNull(),
+  name: text('name').notNull(),
+  concept: text('concept').notNull().default(''),
+  color: text('color').notNull().default('#7c4ff0'),
+  sheet: jsonb('sheet').notNull().default({}),
+  version: integer('version').notNull().default(1),
+  createdAt: ts('created_at').notNull().defaultNow(),
+  updatedAt: ts('updated_at').notNull().defaultNow(),
+  deletedAt: ts('deleted_at'),
+});
+
+export const npcs = pgTable('npcs', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  campaignId: uuid('campaign_id').notNull(),
+  createdBy: uuid('created_by').notNull(),
+  name: text('name').notNull(),
+  appearance: text('appearance').notNull().default(''),
+  publicDescription: text('public_description').notNull().default(''),
+  color: text('color').notNull().default('#c9a24b'),
+  revealed: boolean('revealed').notNull().default(false),
+  createdAt: ts('created_at').notNull().defaultNow(),
+  updatedAt: ts('updated_at').notNull().defaultNow(),
+  deletedAt: ts('deleted_at'),
+});
+
+export const npcGmDetails = pgTable('npc_gm_details', {
+  npcId: uuid('npc_id').primaryKey(),
+  campaignId: uuid('campaign_id').notNull(),
+  personality: text('personality').notNull().default(''),
+  backstory: text('backstory').notNull().default(''),
+  motivations: text('motivations').notNull().default(''),
+  secrets: text('secrets').notNull().default(''),
+  notes: text('notes').notNull().default(''),
+  stats: jsonb('stats').notNull().default([]),
+  updatedAt: ts('updated_at').notNull().defaultNow(),
+});
+
+export const maps = pgTable('maps', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  campaignId: uuid('campaign_id').notNull(),
+  createdBy: uuid('created_by').notNull(),
+  name: text('name').notNull(),
+  cols: integer('cols').notNull().default(24),
+  rows: integer('rows').notNull().default(16),
+  cellLabel: text('cell_label').notNull().default('1,5 m'),
+  terrain: jsonb('terrain').$type<Record<string, string>>().notNull().default({}),
+  shared: boolean('shared').notNull().default(false),
+  createdAt: ts('created_at').notNull().defaultNow(),
+  updatedAt: ts('updated_at').notNull().defaultNow(),
+  deletedAt: ts('deleted_at'),
+});
+
+export const mapTokens = pgTable('map_tokens', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  mapId: uuid('map_id').notNull(),
+  campaignId: uuid('campaign_id').notNull(),
+  kind: text('kind').$type<'character' | 'npc' | 'enemy' | 'object'>().notNull(),
+  label: text('label').notNull(),
+  color: text('color').notNull().default('#7c4ff0'),
+  characterId: uuid('character_id'),
+  npcId: uuid('npc_id'),
+  controlledBy: uuid('controlled_by'),
+  x: integer('x').notNull(),
+  y: integer('y').notNull(),
+  size: integer('size').notNull().default(1),
+  hidden: boolean('hidden').notNull().default(false),
+  createdAt: ts('created_at').notNull().defaultNow(),
+  updatedAt: ts('updated_at').notNull().defaultNow(),
+});
+
+export const diceRolls = pgTable('dice_rolls', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  campaignId: uuid('campaign_id').notNull(),
+  rollerId: uuid('roller_id').notNull(),
+  expression: text('expression').notNull(),
+  label: text('label').notNull().default(''),
+  result: jsonb('result').notNull(),
+  total: integer('total').notNull(),
+  visibility: text('visibility').$type<'public' | 'gm'>().notNull(),
+  createdAt: ts('created_at').notNull().defaultNow(),
+});
+
+export const chatMessages = pgTable('chat_messages', {
+  id: bigint('id', { mode: 'number' }).primaryKey(),
+  campaignId: uuid('campaign_id').notNull(),
+  authorId: uuid('author_id').notNull(),
+  npcId: uuid('npc_id'),
+  speakerName: text('speaker_name'),
+  speakerColor: text('speaker_color'),
+  kind: text('kind').$type<'text' | 'roll'>().notNull(),
+  content: text('content').notNull().default(''),
+  rollId: uuid('roll_id'),
+  visibility: text('visibility').$type<'public' | 'gm'>().notNull(),
   createdAt: ts('created_at').notNull().defaultNow(),
 });

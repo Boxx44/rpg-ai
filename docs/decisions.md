@@ -38,6 +38,14 @@ Formato: cada decisão tem contexto, escolha e motivo. "Pendente" = precisa da s
 
 **ADR-017 — Sem pacote `packages/config` separado.** A configuração de ESLint e TypeScript ficou na raiz (`eslint.config.mjs`, `tsconfig.base.json`): é mais simples e suficiente para o tamanho atual.
 
+**ADR-018 — Mesa de jogo antes da importação de PDFs (aprovado em 17/11/2026).** O responsável pelo produto quer jogar e mestrar o quanto antes. Rolagens, chat, personagens, NPCs e mapas foram adiantados usando regras genéricas; a importação de PDFs e o motor de regras vêm depois e se encaixam nessas funções.
+
+**ADR-019 — Ficha livre enquanto não há sistema.** O personagem tem atributos, recursos (atual/máximo), inventário e anotações definidos pelo próprio jogador, validados no servidor. Não é a "ficha universal fixa" proibida pela especificação: é o modo manual, que continuará disponível para sistemas sem regras importadas.
+
+**ADR-020 — Rolagens, chat e posição de tokens só mudam por funções do banco.** Usuários não têm permissão de INSERT/UPDATE nessas tabelas; a API chama funções em `app_private` que conferem a participação. Rolagens são calculadas no servidor com gerador criptográfico pelo pacote `rules-engine` (sem IA) e não podem ser editadas depois.
+
+**ADR-021 — Tempo real só distribui; alterações chegam pela API REST.** Assim toda ação passa por validação, permissão, limite de requisições e auditoria. Conteúdo secreto vai para a sala dos mestres; para mudanças de mapa/NPC envia-se só um sinal e cada cliente recarrega o que tem permissão de ver. Ao remover um membro ou mudar seu papel, ele é tirado das salas na hora.
+
 ## Decisões pendentes (preciso da sua escolha)
 
 ### D-01 — Provedor principal de IA (LLM)

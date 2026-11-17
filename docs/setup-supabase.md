@@ -25,6 +25,10 @@ Tempo estimado: 20–30 minutos. Nenhum conhecimento de programação é necess�
 Com o `.env` apontando para o Supabase: `pnpm db:migrate`.
 ⚠️ **Não** rode `pnpm db:bootstrap-local` em um projeto Supabase (o comando se recusa a rodar fora de `localhost`).
 
+## 3.1 Desligar o acesso direto às tabelas (recomendado)
+
+O RPG AI não usa a "Data API" automática do Supabase: todo acesso passa pela nossa API. Em _Project Settings → Data API_, remova `public` dos **Exposed schemas** (ou desative a Data API). As regras de segurança do banco continuam valendo de qualquer forma; isso só fecha uma porta que não usamos.
+
 ## 4. URLs de retorno (Authentication → URL Configuration)
 
 - **Site URL:** o endereço do site (local: `http://localhost:3000`).

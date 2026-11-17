@@ -129,7 +129,22 @@ Regras garantidas pelo banco (e testadas):
 - Jogadores não alteram a campanha nem se promovem; não veem convites.
 - Auditoria não pode ser alterada nem apagada, nem inserida diretamente por usuários.
 
-O restante das tabelas entra nas fases correspondentes por novas migrations.
+## Implementado na mesa de jogo (migration `0002_game_table.sql`)
+
+| Tabela           | Observações                                                                                                                                                                          |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `characters`     | Ficha livre em `sheet` (jsonb validado na API, limite de 64 KB), `version` para evitar sobrescrever edição de outra pessoa. Todos da mesa veem; dono do personagem ou mestre editam. |
+| `npcs`           | Parte que pode ser revelada (nome, aparência, descrição pública, `revealed`).                                                                                                        |
+| `npc_gm_details` | Personalidade, história, motivações, segredos, anotações, estatísticas. **Somente mestres** (RLS).                                                                                   |
+| `maps`           | Grade (`cols`, `rows`, `cell_label`), terreno pintado em `terrain` (`{"x,y": "wall"}`), `shared` controla se jogadores veem.                                                         |
+| `map_tokens`     | Posição, tamanho, `hidden` (só mestre vê), `controlled_by` (jogador que pode mover), ligação opcional a personagem/NPC.                                                              |
+| `dice_rolls`     | Resultado completo de cada dado, total, expressão, visibilidade. Imutável.                                                                                                           |
+| `chat_messages`  | Texto ou rolagem, visibilidade (`public`/`gm`), fala como NPC com nome gravado no momento. Imutável.                                                                                 |
+
+Funções novas em `app_private`: `can_play`, `post_message`, `record_roll`, `move_token`, `clamp_tokens`.
+Atualizações limitadas por coluna (não é possível trocar a campanha ou o dono de um registro).
+
+O restante das tabelas (sistemas, documentos, regras, sessões, combate, memória, IA) entra nas fases correspondentes por novas migrations.
 
 ## Backups
 
