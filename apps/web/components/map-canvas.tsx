@@ -1,7 +1,7 @@
 'use client';
 
 import { gridDistance, type MapDto, type Terrain, type TokenDto } from '@rpg-ai/shared';
-import { cn } from '@rpg-ai/ui';
+import { cn, GameIcon } from '@rpg-ai/ui';
 import { useCallback, useRef, useState } from 'react';
 
 export const CELL = 40;
@@ -271,6 +271,12 @@ export function MapCanvas({
                 strokeDasharray={t.hidden ? '4 3' : undefined}
               />
               <circle cx={cx} cy={cy} r={r - 4} fill="url(#g-token)" pointerEvents="none" />
+              <g transform={`translate(${cx + r - 16}, ${cy - r + 2}) scale(0.5)`} pointerEvents="none">
+                <circle cx="12" cy="12" r="12" fill="#09080d" stroke="rgba(201,162,75,.5)" />
+                <g transform="translate(3 3) scale(0.75)">
+                  <GameIcon name={t.kind} size={24} />
+                </g>
+              </g>
               <text
                 x={cx}
                 y={cy + 5 * t.size}

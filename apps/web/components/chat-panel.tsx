@@ -1,7 +1,7 @@
 'use client';
 
 import type { ChatMessageDto, NpcDto, RollPartDto, Visibility } from '@rpg-ai/shared';
-import { Alert, Button, cn, Input, Select } from '@rpg-ai/ui';
+import { Alert, Button, cn, GameIcon, Input, Select } from '@rpg-ai/ui';
 import { Dices, EyeOff, Send } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { api, json } from '@/lib/api';
@@ -70,7 +70,8 @@ function Message({ m, myId }: { m: ChatMessageDto; myId: string }) {
           )}
         >
           <div className="mb-1 flex items-center justify-between gap-2 text-xs text-ink-muted">
-            <span className="truncate">
+            <span className="flex items-center gap-1.5 truncate">
+              <GameIcon name="d20" size={14} />
               {m.roll.label ? <b className="text-ink">{m.roll.label}</b> : 'Rolagem'} · {m.roll.expression}
             </span>
           </div>

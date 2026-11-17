@@ -263,3 +263,4 @@ export function Avatar({ name, src, size = 36 }: { name: string; src?: string | 
     </span>
   );
 }
+export * from './game-icons';

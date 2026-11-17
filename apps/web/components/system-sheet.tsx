@@ -1,7 +1,7 @@
 'use client';
 
 import { computeSheet, type SystemDefinition, type SystemValues } from '@rpg-ai/rules-engine';
-import { Button, cn, Input, Select } from '@rpg-ai/ui';
+import { Button, cn, GameIcon, Input, Select } from '@rpg-ai/ui';
 import { Dices, Minus, Plus } from 'lucide-react';
 
 export type RollTarget = { skill: string } | { attribute: string };
@@ -72,6 +72,27 @@ export function SystemSheet({
 
   return (
     <div className="space-y-6" data-testid="system-sheet">
+      {def.fields.some((f) => f.key === 'classe') && (
+        <div
+          className="flex items-center gap-3 rounded-xl border border-gold/25 bg-gradient-to-r from-arcane-900/50 to-transparent p-3"
+          data-testid="class-banner"
+        >
+          <GameIcon name={String(value.fields.classe ?? '')} size={40} />
+          <div>
+            <p className="font-display text-lg tracking-wide text-gold-bright">
+              {def.fields
+                .find((f) => f.key === 'classe')
+                ?.options?.find((o) => o.value === String(value.fields.classe))?.label ?? 'Sem classe'}
+            </p>
+            <p className="text-xs text-ink-muted">
+              NEX {String(value.fields.nex ?? '—')}%
+              {value.fields.origem
+                ? ` · ${def.fields.find((f) => f.key === 'origem')?.options?.find((o) => o.value === String(value.fields.origem))?.label ?? ''}`
+                : ''}
+            </p>
+          </div>
+        </div>
+      )}
       {def.fields.length > 0 && (
         <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
           {def.fields.map((f) => (
@@ -119,6 +140,7 @@ export function SystemSheet({
                 key={a.key}
                 className="relative flex flex-col items-center gap-1 rounded-xl border border-gold/30 bg-gradient-to-b from-arcane-900/40 to-surface-2 p-3"
               >
+                <GameIcon name={a.key} size={26} />
                 <span className="font-display text-xs tracking-widest text-gold-bright">{a.abbr}</span>
                 <Input
                   aria-label={a.label}
@@ -167,7 +189,8 @@ export function SystemSheet({
                 data-testid={`resource-${r.key}`}
               >
                 <div className="flex items-baseline justify-between">
-                  <span className="text-xs font-semibold uppercase tracking-[0.12em] text-ink-muted">
+                  <span className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.12em] text-ink-muted">
+                    <GameIcon name={r.key} size={20} />
                     {r.label}
                   </span>
                   <span className="font-display text-lg tabular-nums text-ink">
@@ -218,9 +241,10 @@ export function SystemSheet({
             {computed.derived.map((d) => (
               <span
                 key={d.key}
-                className="rounded-md border border-line bg-surface-2 px-3 py-1.5 text-sm"
+                className="inline-flex items-center gap-1.5 rounded-md border border-line bg-surface-2 px-3 py-1.5 text-sm"
                 data-testid={`derived-${d.key}`}
               >
+                <GameIcon name={d.key} size={18} />
                 <span className="text-ink-muted">{d.label}: </span>
                 <b className="text-ink">
                   {d.value}

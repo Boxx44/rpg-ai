@@ -2,7 +2,7 @@
 
 import type { SystemDefinition } from '@rpg-ai/rules-engine';
 import type { CampaignSystemDto, CharacterDto, DocumentPageDto, RuleSearchHitDto } from '@rpg-ai/shared';
-import { Alert, Button, cn, Input, Select } from '@rpg-ai/ui';
+import { Alert, Button, cn, GameIcon, Input, Select } from '@rpg-ai/ui';
 import { ArrowLeft, ChevronLeft, ChevronRight, Dices, Minus, Plus, Search } from 'lucide-react';
 import Link from 'next/link';
 import { Fragment, useState } from 'react';
@@ -304,7 +304,12 @@ export function QuickSheetPanel({
         </Select>
       )}
       <div className="flex items-center gap-3">
-        <span className="size-8 rounded-full border-2 border-black/40" style={{ background: ch.color }} />
+        <span
+          className="flex size-10 shrink-0 items-center justify-center rounded-full border-2 border-black/40"
+          style={{ background: ch.color }}
+        >
+          <GameIcon name={String(values.fields.classe ?? 'character')} size={24} />
+        </span>
         <div className="min-w-0">
           <p className="truncate font-display tracking-wide">{ch.name}</p>
           <p className="text-xs text-ink-faint">
@@ -319,6 +324,7 @@ export function QuickSheetPanel({
       <div className="space-y-2">
         {computed.resources.map((r) => (
           <div key={r.key} className="flex items-center gap-2" data-testid={`quick-${r.key}`}>
+            <GameIcon name={r.key} size={18} title={r.label} />
             <span className="w-9 text-xs font-semibold text-ink-muted">{r.abbr}</span>
             <Button
               size="icon"
@@ -366,6 +372,7 @@ export function QuickSheetPanel({
             className="flex flex-col items-center rounded-lg border border-gold/30 bg-surface-2 py-1.5 transition-colors hover:border-gold disabled:opacity-50"
             aria-label={`Rolar ${a.label}`}
           >
+            <GameIcon name={a.key} size={18} />
             <span className="text-[10px] tracking-widest text-gold/80">{a.abbr}</span>
             <span className="font-display text-lg">{values.attributes[a.key]}</span>
           </button>
