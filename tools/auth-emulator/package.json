@@ -1,0 +1,15 @@
+{
+  "name": "@rpg-ai/auth-emulator",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Emulador MÍNIMO do Supabase Auth, somente para desenvolvimento local e testes automatizados. Nunca usar em produção.",
+  "type": "module",
+  "main": "server.mjs",
+  "scripts": {
+    "start": "node server.mjs",
+    "lint": "eslint ."
+  },
+  "dependencies": {
+    "postgres": "^3.4.5"
+  }
+}

@@ -1,0 +1,86 @@
+/* ════════════════════════════════════════════════════════════════
+   RPG AI — tema Dark Fantasy (Tailwind CSS v4)
+   Preto · grafite · roxo arcano · detalhes em dourado envelhecido
+   ════════════════════════════════════════════════════════════════ */
+@theme {
+  --color-bg: #09080d;
+  --color-surface: #121019;
+  --color-surface-2: #1a1723;
+  --color-surface-3: #24202f;
+  --color-line: #2c2738;
+  --color-ink: #ece7f5;
+  --color-ink-muted: #a59eb5;
+  --color-ink-faint: #6e6780;
+
+  --color-arcane-100: #ede4ff;
+  --color-arcane-200: #d6c4ff;
+  --color-arcane-300: #b99bff;
+  --color-arcane-400: #9b72f7;
+  --color-arcane-500: #7c4ff0;
+  --color-arcane-600: #6534d6;
+  --color-arcane-700: #4c23a8;
+  --color-arcane-900: #1f0f45;
+
+  --color-gold: #c9a24b;
+  --color-gold-bright: #e6c87f;
+  --color-blood: #b4232f;
+  --color-blood-light: #f08a92;
+
+  --font-display: 'Cinzel', 'Times New Roman', serif;
+  --font-sans: 'Inter Variable', 'Inter', system-ui, sans-serif;
+
+  --animate-rise: rise 0.5s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  --animate-glow: glow 6s ease-in-out infinite;
+
+  @keyframes rise {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  @keyframes glow {
+    0%,
+    100% {
+      opacity: 0.55;
+    }
+    50% {
+      opacity: 0.85;
+    }
+  }
+}
+
+@layer base {
+  html {
+    color-scheme: dark;
+  }
+  body {
+    background-color: var(--color-bg);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    background-image:
+      radial-gradient(1200px 600px at 85% -10%, rgba(124, 79, 240, 0.14), transparent 60%),
+      radial-gradient(900px 500px at -10% 110%, rgba(201, 162, 75, 0.06), transparent 60%);
+    background-attachment: fixed;
+    min-height: 100dvh;
+  }
+  ::selection {
+    background: rgba(124, 79, 240, 0.45);
+    color: white;
+  }
+  :focus-visible {
+    outline-color: var(--color-gold);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}

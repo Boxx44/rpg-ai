@@ -1,0 +1,28 @@
+{
+  "name": "@rpg-ai/db",
+  "version": "0.1.0",
+  "private": true,
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist",
+    "migrations",
+    "local"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "eslint src test",
+    "migrate": "node dist/cli.js migrate",
+    "bootstrap-local": "node dist/cli.js bootstrap-local",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "drizzle-orm": "^0.38.3",
+    "postgres": "^3.4.5"
+  },
+  "devDependencies": {
+    "vitest": "^3.0.0",
+    "@types/node": "^22.10.0"
+  }
+}

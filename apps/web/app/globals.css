@@ -1,0 +1,7 @@
+@import 'tailwindcss';
+@import '@rpg-ai/ui/theme.css';
+@import '@fontsource/cinzel/400.css';
+@import '@fontsource/cinzel/600.css';
+@import '@fontsource-variable/inter';
+
+@source '../../../packages/ui/src';
