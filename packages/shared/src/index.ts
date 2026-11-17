@@ -130,7 +130,7 @@ export interface OrganizationDto {
 
 export interface HealthDto {
   status: 'ok' | 'degraded';
-  checks: { database: 'ok' | 'down'; redis: 'ok' | 'down' };
+  checks: { database: 'ok' | 'down'; redis: 'ok' | 'down' | 'disabled' };
   version: string;
 }
 

@@ -26,27 +26,31 @@ class CorsIoAdapter extends IoAdapter {
 export interface CreatedApp {
   app: NestExpressApplication;
   db: DbHandle;
-  redis: Redis;
+  redis: Redis | null;
   close(): Promise<void>;
 }
 
 export async function createApp(config: AppConfig): Promise<CreatedApp> {
   const logger = createLogger('api', { level: config.LOG_LEVEL });
   const db = createDb(config.DATABASE_URL);
-  const redis = new Redis(config.REDIS_URL, {
-    maxRetriesPerRequest: 1,
-    enableOfflineQueue: false,
-    lazyConnect: false,
-  });
-  redis.on('error', (err) => logger.warn({ err: err.message }, 'redis error'));
-  // Espera o Redis por até 3 s; se não vier, a API sobe em modo degradado (o /health mostra).
-  await new Promise<void>((resolve) => {
-    const timer = setTimeout(resolve, 3000);
-    redis.once('ready', () => {
-      clearTimeout(timer);
-      resolve();
+  const redis = config.REDIS_URL
+    ? new Redis(config.REDIS_URL, { maxRetriesPerRequest: 1, enableOfflineQueue: false, lazyConnect: false })
+    : null;
+  if (redis) {
+    redis.on('error', (err) => logger.warn({ err: err.message }, 'redis error'));
+    // Espera o Redis por até 3 s; se não vier, a API sobe em modo degradado (o /health mostra).
+    await new Promise<void>((resolve) => {
+      const timer = setTimeout(resolve, 3000);
+      redis.once('ready', () => {
+        clearTimeout(timer);
+        resolve();
+      });
     });
-  });
+  } else {
+    logger.warn(
+      'REDIS_URL não definido: limite de requisições em memória (uma instância só) e livros processados direto.',
+    );
+  }
 
   const app = await NestFactory.create<NestExpressApplication>(
     AppModule.register({ config, db: db.db, redis, logger }),
@@ -70,7 +74,7 @@ export async function createApp(config: AppConfig): Promise<CreatedApp> {
     redis,
     close: async () => {
       await app.close();
-      redis.disconnect();
+      redis?.disconnect();
       await db.close();
     },
   };

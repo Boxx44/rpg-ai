@@ -1,0 +1,32 @@
+# Render (plano gratuito): servidor do jogo (API + tempo real).
+# Variáveis marcadas com sync: false são preenchidas no painel do Render (nunca no código).
+services:
+  - type: web
+    name: rpg-ai-api
+    runtime: node
+    plan: free
+    region: virginia
+    buildCommand: npm install -g pnpm@10 && pnpm install --frozen-lockfile && pnpm turbo run build --filter=@rpg-ai/api...
+    startCommand: node apps/api/dist/main.js
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_VERSION
+        value: '22'
+      - key: NODE_ENV
+        value: production
+      - key: NODE_OPTIONS
+        value: --max-old-space-size=400
+      - key: MIGRATE_ON_START
+        value: 'true'
+      - key: STORAGE_DIR
+        value: /tmp/rpg-ai-storage
+      - key: LOG_LEVEL
+        value: info
+      - key: DATABASE_URL
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_JWT_SECRET
+        sync: false
+      - key: WEB_ORIGIN
+        sync: false

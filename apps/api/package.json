@@ -44,5 +44,8 @@
     "supertest": "^7.0.0",
     "unplugin-swc": "^1.5.1",
     "vitest": "^3.0.0"
+  },
+  "engines": {
+    "node": ">=22"
   }
 }

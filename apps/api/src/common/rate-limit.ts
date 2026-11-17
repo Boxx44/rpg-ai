@@ -16,10 +16,21 @@ import { LOGGER, REDIS } from './tokens';
 @Injectable()
 export class RateLimitGuard implements CanActivate {
   constructor(
-    @Inject(REDIS) private readonly redis: Redis,
+    @Inject(REDIS) private readonly redis: Redis | null,
     @Inject(APP_CONFIG) private readonly config: AppConfig,
     @Inject(LOGGER) private readonly logger: Logger,
   ) {}
+
+  /** Contador em memória quando não há Redis (vale para uma instância da API). */
+  private readonly memory = new Map<string, number>();
+  private memoryIncr(key: string): number {
+    if (this.memory.size > 50_000) this.memory.clear();
+    const window = key.slice(key.lastIndexOf(':') + 1);
+    for (const k of this.memory.keys()) if (!k.endsWith(`:${window}`)) this.memory.delete(k);
+    const n = (this.memory.get(key) ?? 0) + 1;
+    this.memory.set(key, n);
+    return n;
+  }
 
   async canActivate(ctx: ExecutionContext): Promise<boolean> {
     if (ctx.getType() !== 'http') return true;
@@ -32,8 +43,12 @@ export class RateLimitGuard implements CanActivate {
     const limit = this.config.RATE_LIMIT_PER_MINUTE;
     let count: number;
     try {
-      const r = await this.redis.multi().incr(key).expire(key, 61).exec();
-      count = Number(r?.[0]?.[1] ?? 0);
+      if (this.redis) {
+        const r = await this.redis.multi().incr(key).expire(key, 61).exec();
+        count = Number(r?.[0]?.[1] ?? 0);
+      } else {
+        count = this.memoryIncr(key);
+      }
     } catch (err) {
       this.logger.warn({ err }, 'rate limit indisponível (Redis)');
       return true;

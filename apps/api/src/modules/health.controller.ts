@@ -16,7 +16,7 @@ async function within<T>(p: Promise<T>, ms = 2000): Promise<T> {
 export class HealthController {
   constructor(
     @Inject(DB) private readonly db: Database,
-    @Inject(REDIS) private readonly redis: Redis,
+    @Inject(REDIS) private readonly redis: Redis | null,
   ) {}
 
   @Public()
@@ -26,11 +26,13 @@ export class HealthController {
       () => 'ok' as const,
       () => 'down' as const,
     );
-    const redis = await within(this.redis.ping()).then(
-      (r) => (r === 'PONG' ? ('ok' as const) : ('down' as const)),
-      () => 'down' as const,
-    );
-    const status = database === 'ok' && redis === 'ok' ? 'ok' : 'degraded';
+    const redis = this.redis
+      ? await within(this.redis.ping()).then(
+          (r) => (r === 'PONG' ? ('ok' as const) : ('down' as const)),
+          () => 'down' as const,
+        )
+      : ('disabled' as const);
+    const status = database === 'ok' && redis !== 'down' ? 'ok' : 'degraded';
     if (status !== 'ok') res.status(503);
     return { status, checks: { database, redis }, version: VERSION };
   }

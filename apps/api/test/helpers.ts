@@ -28,7 +28,7 @@ export async function setupApp(overrides: Partial<Record<string, string>> = {}):
     ...overrides,
   });
   const created = await createApp(config);
-  await created.redis.flushdb();
+  await created.redis?.flushdb();
   await created.app.init();
   const sql = postgres(url, { max: 2, onnotice: () => undefined });
   return {

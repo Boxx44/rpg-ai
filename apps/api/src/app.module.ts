@@ -29,7 +29,7 @@ import { Realtime, RealtimeGateway } from './modules/realtime.gateway';
 export interface AppDeps {
   config: AppConfig;
   db: Database;
-  redis: Redis;
+  redis: Redis | null;
   logger: Logger;
 }
 

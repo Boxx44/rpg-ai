@@ -4,7 +4,17 @@ const envSchema = z
   .object({
     NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
     DATABASE_URL: z.string().url(),
-    REDIS_URL: z.string().url(),
+    /** Opcional: sem Redis, limite de requisições fica em memória e livros são processados direto. */
+    REDIS_URL: z
+      .string()
+      .url()
+      .optional()
+      .or(z.literal('').transform(() => undefined)),
+    /** Aplica as migrations do banco ao iniciar (usado na hospedagem). */
+    MIGRATE_ON_START: z
+      .enum(['true', 'false'])
+      .default('false')
+      .transform((v) => v === 'true'),
     SUPABASE_URL: z.string().url(),
     SUPABASE_JWT_SECRET: z
       .string()
