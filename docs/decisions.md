@@ -46,6 +46,18 @@ Formato: cada decisão tem contexto, escolha e motivo. "Pendente" = precisa da s
 
 **ADR-021 — Tempo real só distribui; alterações chegam pela API REST.** Assim toda ação passa por validação, permissão, limite de requisições e auditoria. Conteúdo secreto vai para a sala dos mestres; para mudanças de mapa/NPC envia-se só um sinal e cada cliente recarrega o que tem permissão de ver. Ao remover um membro ou mudar seu papel, ele é tirado das salas na hora.
 
+**ADR-022 — Livros enviados são privados (resolve D-05).** O PDF e o texto extraído ficam acessíveis só à organização de quem enviou e aos membros das campanhas que usam aquele sistema (para consultar regras na mesa). Não há biblioteca pública. Apagar o livro remove o arquivo e o texto. O usuário declara possuir o material. Antes de abrir para o público, ainda recomendo revisão jurídica.
+
+**ADR-023 — Modelos de sistema revisados à mão + busca no livro, antes da extração por IA.** Para o Ordem Paranormal, as mecânicas (atributos, 28 perícias, graus, classes, PV/PE/SAN por NEX, Defesa, 26 origens) foram lidas do livro e codificadas como DADOS em `packages/rules-engine/src/systems/ordem-paranormal.ts`, com a página de cada regra. Nenhum trecho do livro é copiado para o código. A extração automática por IA (Fase "Importação de PDFs") continua no roteiro; ela custa dinheiro por livro e precisará de revisão humana de qualquer forma.
+
+**ADR-024 — Busca de regras por texto completo do Postgres (português, sem acentos), sem embeddings por enquanto.** Custo zero, sem serviços externos, roda localmente e no Supabase. Busca por significado (embeddings/pgvector) entra junto com a IA.
+
+**ADR-025 — Linguagem de fórmulas segura (primeira parte da DSL).** `packages/rules-engine/src/expr.ts`: aritmética, comparações e funções em lista branca (`attr`, `field`, `lookup`, `min`, `max`, `floor`, `ceil`, `round`, `if`). Sem eval. Usada para PV/PE/SAN/Defesa.
+
+**ADR-026 — Correção de exclusão lógica com RLS (migration 0004).** No Postgres, uma linha alterada precisa continuar visível pela política de leitura de quem alterou. As políticas de NPCs, mapas e personagens foram ajustadas: quem pode apagar continua vendo a linha apagada (a API sempre filtra), os demais nunca veem.
+
+**ADR-027 — Instalação no Windows por scripts de dois cliques.** `INSTALAR.bat` instala Node.js e Docker Desktop via winget, dependências, compila e prepara o banco; `INICIAR.bat` sobe tudo e abre o navegador. O banco e o Redis rodam no Docker (a extensão pgvector exigida pelas migrations vem pronta na imagem).
+
 ## Decisões pendentes (preciso da sua escolha)
 
 ### D-01 — Provedor principal de IA (LLM)
@@ -80,7 +92,7 @@ Recomendação: **Vercel** (site) + **Railway ou Fly.io** (API e worker) + **Sup
 | Serviço de nuvem (Google Document AI / AWS Textract)                                                                                            | Ótimo em tabelas.                                          | Mais um fornecedor e conta.                                                           |
 | Recomendação: Tesseract como primeira tentativa barata + IA com visão para páginas com baixa confiança ou com tabelas. Decidir antes da Fase 2. |
 
-### D-05 — Política para PDFs com direitos autorais
+### ~~D-05 — Política para PDFs com direitos autorais~~ → resolvida pela ADR-022 (privado). Texto original:
 
 Recomendação: livros enviados ficam privados ao usuário/organização; termos de uso exigindo que o usuário possua o material; sem biblioteca pública de livros comerciais; canal de remoção (notificação de direitos). **Sugiro consultar um advogado antes do lançamento público.** Decidir antes da Fase 2.
 

@@ -91,6 +91,7 @@ export interface CampaignDto {
   status: CampaignStatus;
   myRole: CampaignRole;
   memberCount: number;
+  system: { id: string; name: string } | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -154,3 +155,4 @@ export function canManageCampaign(role: CampaignRole | null | undefined): boolea
   return role != null && MANAGER_ROLES.includes(role);
 }
 export * from './game';
+export * from './systems';

@@ -144,7 +144,20 @@ Regras garantidas pelo banco (e testadas):
 Funções novas em `app_private`: `can_play`, `post_message`, `record_roll`, `move_token`, `clamp_tokens`.
 Atualizações limitadas por coluna (não é possível trocar a campanha ou o dono de um registro).
 
-O restante das tabelas (sistemas, documentos, regras, sessões, combate, memória, IA) entra nas fases correspondentes por novas migrations.
+## Sistemas e livros (migrations `0003` e `0004`)
+
+| Tabela                        | Observações                                                                                                                           |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| `rpg_systems`                 | Sistema de uma organização; `template_id` indica o modelo pronto usado (ex.: `ordem_paranormal`).                                     |
+| `system_versions`             | Definição completa em JSON (validada pelo motor de regras). Imutável: campanhas ficam presas a uma versão.                            |
+| `documents`                   | PDF enviado: nome, tamanho, SHA-256 (evita duplicata), status (`queued`/`processing`/`ready`/`failed`), progresso, páginas sem texto. |
+| `document_pages`              | Texto de cada página + índice de busca em português sem acentos (`tsv`, GIN).                                                         |
+| `campaigns.system_version_id` | Agora com chave estrangeira; só muda pela função `set_campaign_system` (mestre, mesma organização).                                   |
+
+Acesso ao livro: `app_private.can_read_system` = membro da organização dona OU membro de campanha que usa o sistema.
+Migration `0004`: correção das políticas de exclusão lógica (ver ADR-026).
+
+O restante (regras extraídas, sessões, combate, memória, IA) entra nas fases correspondentes.
 
 ## Backups
 

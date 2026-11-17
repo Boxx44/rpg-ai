@@ -1,6 +1,15 @@
 'use client';
 
-import type { CampaignRole, ChatMessageDto, MapDto, MapSummaryDto, NpcDto, TokenDto } from '@rpg-ai/shared';
+import type {
+  CampaignRole,
+  CampaignSystemDto,
+  CharacterDto,
+  ChatMessageDto,
+  MapDto,
+  MapSummaryDto,
+  NpcDto,
+  TokenDto,
+} from '@rpg-ai/shared';
 import { canManageCampaign } from '@rpg-ai/shared';
 import { Alert, Badge, Button, cn, Select } from '@rpg-ai/ui';
 import { Minus, Plus, Wifi, WifiOff } from 'lucide-react';
@@ -11,6 +20,7 @@ import { useCampaignRealtime } from '@/lib/realtime';
 import { accessToken } from '@/lib/supabase';
 import { ChatPanel } from './chat-panel';
 import { MapCanvas } from './map-canvas';
+import { QuickSheetPanel, RulesPanel } from './table-panels';
 
 export function GameTable({
   campaignId,
@@ -19,6 +29,8 @@ export function GameTable({
   initialMessages,
   initialMaps,
   initialNpcs,
+  initialCharacters,
+  system,
 }: {
   campaignId: string;
   myId: string;
@@ -26,7 +38,11 @@ export function GameTable({
   initialMessages: ChatMessageDto[];
   initialMaps: MapSummaryDto[];
   initialNpcs: NpcDto[];
+  initialCharacters: CharacterDto[];
+  system: CampaignSystemDto | null;
 }) {
+  const [tab, setTab] = useState<'chat' | 'sheet' | 'rules'>('chat');
+  const [characters, setCharacters] = useState(initialCharacters);
   const manager = canManageCampaign(myRole);
   const [messages, setMessages] = useState(initialMessages);
   const [maps, setMaps] = useState(initialMaps);
@@ -101,6 +117,10 @@ export function GameTable({
         if (p.mapId === mapId) void loadMap(mapId);
       },
       'npcs.changed': () => void loadNpcs(),
+      'characters.changed': () =>
+        void accessToken()
+          .then((t) => api<CharacterDto[]>(`/campaigns/${campaignId}/characters`, t))
+          .then(setCharacters),
     },
     resync,
   );
@@ -201,16 +221,61 @@ export function GameTable({
           </p>
         )}
       </section>
-      <div className="xl:sticky xl:top-20 xl:h-[calc(100dvh-7rem)]">
-        <ChatPanel
-          campaignId={campaignId}
-          messages={messages}
-          myId={myId}
-          canPlay={myRole !== 'spectator'}
-          isManager={manager}
-          npcs={npcs}
-          onSent={addMessage}
-        />
+      <div className="flex flex-col gap-2 xl:sticky xl:top-20 xl:h-[calc(100dvh-7rem)]">
+        <div
+          className="flex gap-1 rounded-lg border border-line bg-surface/80 p-1"
+          role="tablist"
+          aria-label="Painel lateral"
+        >
+          {(
+            [
+              ['chat', 'Crônica'],
+              ['sheet', 'Ficha'],
+              ['rules', 'Regras'],
+            ] as const
+          ).map(([k, label]) => (
+            <button
+              key={k}
+              type="button"
+              role="tab"
+              aria-selected={tab === k}
+              onClick={() => setTab(k)}
+              className={cn(
+                'flex-1 rounded-md px-3 py-1.5 text-sm transition-colors',
+                tab === k ? 'bg-arcane-700/60 text-ink' : 'text-ink-muted hover:text-ink',
+              )}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        <div className={cn('min-h-0 flex-1', tab !== 'chat' && 'hidden')}>
+          <ChatPanel
+            campaignId={campaignId}
+            messages={messages}
+            myId={myId}
+            canPlay={myRole !== 'spectator'}
+            isManager={manager}
+            npcs={npcs}
+            onSent={addMessage}
+          />
+        </div>
+        {tab !== 'chat' && (
+          <section className="min-h-[420px] flex-1 overflow-hidden rounded-xl border border-line bg-surface/80">
+            {tab === 'sheet' ? (
+              <QuickSheetPanel
+                campaignId={campaignId}
+                system={system}
+                characters={characters}
+                myId={myId}
+                manager={manager}
+                onUpdated={(c) => setCharacters((list) => list.map((x) => (x.id === c.id ? c : x)))}
+              />
+            ) : (
+              <RulesPanel campaignId={campaignId} system={system} manager={manager} />
+            )}
+          </section>
+        )}
       </div>
     </div>
   );

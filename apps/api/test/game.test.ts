@@ -391,3 +391,37 @@ describe('membro removido para de receber eventos', () => {
     expect((await l2.s.emitWithAck('campaign.join', { campaignId: cid })).ok).toBe(false);
   });
 });
+
+describe('exclusões', () => {
+  it('mestre apaga NPC, mapa e personagem; jogador apaga o próprio personagem', async () => {
+    const n = await request(t.http)
+      .post(`/campaigns/${cid}/npcs`)
+      .set(auth(gm))
+      .send({ name: 'Temporário' })
+      .expect(201);
+    await request(t.http).delete(`/campaigns/${cid}/npcs/${n.body.id}`).set(auth(p1)).expect(403);
+    await request(t.http).delete(`/campaigns/${cid}/npcs/${n.body.id}`).set(auth(gm)).expect(204);
+    expect(
+      (await request(t.http).get(`/campaigns/${cid}/npcs`).set(auth(gm)).expect(200)).body.some(
+        (x: { id: string }) => x.id === n.body.id,
+      ),
+    ).toBe(false);
+
+    const m = await request(t.http)
+      .post(`/campaigns/${cid}/maps`)
+      .set(auth(gm))
+      .send({ name: 'Rascunho' })
+      .expect(201);
+    await request(t.http).delete(`/campaigns/${cid}/maps/${m.body.id}`).set(auth(gm)).expect(204);
+    await request(t.http).get(`/campaigns/${cid}/maps/${m.body.id}`).set(auth(gm)).expect(404);
+
+    const c = await request(t.http)
+      .post(`/campaigns/${cid}/characters`)
+      .set(auth(p1))
+      .send({ name: 'Descartável' })
+      .expect(201);
+    await request(t.http).delete(`/campaigns/${cid}/characters/${c.body.id}`).set(auth(p1)).expect(204);
+    const list = await request(t.http).get(`/campaigns/${cid}/characters`).set(auth(p1)).expect(200);
+    expect(list.body.some((x: { id: string }) => x.id === c.body.id)).toBe(false);
+  });
+});

@@ -15,6 +15,14 @@ const envSchema = z
     WEB_ORIGIN: z.string().url(),
     RATE_LIMIT_PER_MINUTE: z.coerce.number().int().positive().default(120),
     AUDIT_IP_SALT: z.string().optional(),
+    /** Pasta onde os livros enviados ficam guardados (disco local, custo zero). */
+    STORAGE_DIR: z.string().default('./data/storage'),
+    /** Processa documentos neste mesmo processo (true) ou só enfileira (false, quando houver worker separado). */
+    WORKER_ENABLED: z
+      .enum(['true', 'false'])
+      .default('true')
+      .transform((v) => v === 'true'),
+    MAX_UPLOAD_MB: z.coerce.number().int().min(1).max(1000).default(300),
     LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']).default('info'),
   })
   .superRefine((env, ctx) => {

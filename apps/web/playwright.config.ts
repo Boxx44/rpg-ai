@@ -48,6 +48,7 @@ export default defineConfig({
         WEB_ORIGIN: 'http://localhost:3100',
         RATE_LIMIT_PER_MINUTE: '600',
         LOG_LEVEL: 'warn',
+        STORAGE_DIR: '/tmp/rpg-e2e-storage',
       },
       reuseExistingServer: false,
     },

@@ -13,6 +13,7 @@
   "dependencies": {
     "@fontsource-variable/inter": "^5.1.1",
     "@fontsource/cinzel": "^5.1.1",
+    "@rpg-ai/rules-engine": "workspace:*",
     "@rpg-ai/shared": "workspace:*",
     "@rpg-ai/ui": "workspace:*",
     "@supabase/ssr": "^0.5.2",

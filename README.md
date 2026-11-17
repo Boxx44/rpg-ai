@@ -4,7 +4,13 @@ Plataforma multiplayer de RPG de mesa com Mestre humano, Mestre de IA ou Mestre 
 
 **Status:** Fase 1 (Fundação) concluída localmente. Veja `docs/progress.md`.
 
-## Rodar no seu computador (custo zero)
+## Windows: dois cliques
+
+1. Descompacte a pasta `rpg-ai` (por exemplo, em Documentos).
+2. Dê dois cliques em **INSTALAR.bat** e siga as mensagens. Na primeira vez ele instala o Node.js e o Docker Desktop: depois disso pode pedir para fechar a janela ou reiniciar o computador e rodar de novo. O Docker exige virtualização ativada (já vem ligada na maioria dos PCs).
+3. Dê dois cliques em **INICIAR.bat**. O RPG AI abre em http://localhost:3000.
+
+## Rodar no seu computador (custo zero, passo a passo manual)
 
 Pré-requisitos: [Node.js 22+](https://nodejs.org), [pnpm](https://pnpm.io) e [Docker Desktop](https://www.docker.com/products/docker-desktop/).
 

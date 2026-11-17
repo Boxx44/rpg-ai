@@ -108,7 +108,11 @@ export class ChatService {
     return dto;
   }
 
-  async roll(userId: string, cid: string, input: RollInput): Promise<ChatMessageDto> {
+  async roll(
+    userId: string,
+    cid: string,
+    input: Pick<RollInput, 'expression' | 'label' | 'visibility'>,
+  ): Promise<ChatMessageDto> {
     let result;
     try {
       result = rollDice(input.expression, secureRng);

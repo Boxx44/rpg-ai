@@ -1,3 +1,4 @@
+import { CampaignSystemPanel } from '@/components/system-panels';
 import {
   type CampaignDto,
   type CampaignMemberDto,
@@ -35,6 +36,7 @@ export default async function ManagePage({ params }: { params: Promise<{ id: str
       </div>
       {manager && (
         <div className="space-y-6">
+          <CampaignSystemPanel campaign={campaign} />
           <InvitationsPanel campaignId={id} invitations={invitations} myRole={campaign.myRole} />
           <SettingsPanel campaign={campaign} />
         </div>

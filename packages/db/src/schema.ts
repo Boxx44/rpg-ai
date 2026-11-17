@@ -210,3 +210,49 @@ export const chatMessages = pgTable('chat_messages', {
   visibility: text('visibility').$type<'public' | 'gm'>().notNull(),
   createdAt: ts('created_at').notNull().defaultNow(),
 });
+
+export const rpgSystems = pgTable('rpg_systems', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  organizationId: uuid('organization_id').notNull(),
+  createdBy: uuid('created_by').notNull(),
+  templateId: text('template_id'),
+  name: text('name').notNull(),
+  createdAt: ts('created_at').notNull().defaultNow(),
+  updatedAt: ts('updated_at').notNull().defaultNow(),
+  deletedAt: ts('deleted_at'),
+});
+
+export const systemVersions = pgTable('system_versions', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  systemId: uuid('system_id').notNull(),
+  version: integer('version').notNull(),
+  definition: jsonb('definition').notNull(),
+  createdBy: uuid('created_by').notNull(),
+  createdAt: ts('created_at').notNull().defaultNow(),
+});
+
+export const documents = pgTable('documents', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  systemId: uuid('system_id').notNull(),
+  uploadedBy: uuid('uploaded_by').notNull(),
+  filename: text('filename').notNull(),
+  storageKey: text('storage_key').notNull(),
+  sha256: text('sha256').notNull(),
+  sizeBytes: bigint('size_bytes', { mode: 'number' }).notNull(),
+  pageCount: integer('page_count'),
+  pagesWithoutText: integer('pages_without_text'),
+  status: text('status').$type<'queued' | 'processing' | 'ready' | 'failed'>().notNull().default('queued'),
+  progress: integer('progress').notNull().default(0),
+  error: text('error'),
+  createdAt: ts('created_at').notNull().defaultNow(),
+  updatedAt: ts('updated_at').notNull().defaultNow(),
+  deletedAt: ts('deleted_at'),
+});
+
+export const documentPages = pgTable('document_pages', {
+  id: bigint('id', { mode: 'number' }).primaryKey().generatedAlwaysAsIdentity(),
+  documentId: uuid('document_id').notNull(),
+  systemId: uuid('system_id').notNull(),
+  pageNumber: integer('page_number').notNull(),
+  text: text('text').notNull(),
+});

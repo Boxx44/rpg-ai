@@ -44,15 +44,20 @@ export class CampaignsService {
         status: c.status,
         myRole: m.role,
         memberCount: sql<number>`(select count(*)::int from campaign_members x where x.campaign_id = ${c.id})`,
+        systemId: schema.rpgSystems.id,
+        systemName: schema.rpgSystems.name,
         createdAt: c.createdAt,
         updatedAt: c.updatedAt,
       })
       .from(c)
       .innerJoin(m, and(eq(m.campaignId, c.id), eq(m.userId, userId)))
+      .leftJoin(schema.systemVersions, eq(schema.systemVersions.id, c.systemVersionId))
+      .leftJoin(schema.rpgSystems, eq(schema.rpgSystems.id, schema.systemVersions.systemId))
       .where(and(isNull(c.deletedAt), id ? eq(c.id, id) : undefined))
       .orderBy(desc(c.updatedAt));
-    return rows.map((r) => ({
+    return rows.map(({ systemId, systemName, ...r }) => ({
       ...r,
+      system: systemId && systemName ? { id: systemId, name: systemName } : null,
       createdAt: r.createdAt.toISOString(),
       updatedAt: r.updatedAt.toISOString(),
     }));

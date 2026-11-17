@@ -16,6 +16,13 @@ import { MeController } from './modules/me.controller';
 import { CharactersController, CharactersService } from './modules/characters';
 import { ChatController, ChatService } from './modules/chat';
 import { MapsController, MapsService } from './modules/maps';
+import {
+  createFileStorage,
+  DocumentQueue,
+  FILE_STORAGE,
+  SystemsController,
+  SystemsService,
+} from './modules/documents/systems';
 import { NpcsController, NpcsService } from './modules/npcs';
 import { Realtime, RealtimeGateway } from './modules/realtime.gateway';
 
@@ -40,6 +47,7 @@ export class AppModule implements NestModule {
         CharactersController,
         NpcsController,
         MapsController,
+        SystemsController,
       ],
       providers: [
         { provide: APP_CONFIG, useValue: deps.config },
@@ -55,6 +63,9 @@ export class AppModule implements NestModule {
         CharactersService,
         NpcsService,
         MapsService,
+        SystemsService,
+        DocumentQueue,
+        { provide: FILE_STORAGE, useValue: createFileStorage(deps.config) },
         { provide: APP_GUARD, useClass: AuthGuard },
         { provide: APP_GUARD, useClass: RateLimitGuard },
         { provide: APP_FILTER, useClass: GlobalExceptionFilter },

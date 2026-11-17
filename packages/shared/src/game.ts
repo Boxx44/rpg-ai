@@ -79,6 +79,15 @@ export const characterSheetSchema = z.object({
     .max(100)
     .default([]),
   notes: text(8000).default(''),
+  /** Valores do sistema da campanha (validados no servidor contra a definição do sistema). */
+  system: z
+    .object({
+      attributes: z.record(z.number().int()).default({}),
+      fields: z.record(z.union([z.string().max(120), z.number()])).default({}),
+      skills: z.record(z.string().max(40)).default({}),
+      current: z.record(z.number().int()).default({}),
+    })
+    .optional(),
 });
 export type CharacterSheet = z.infer<typeof characterSheetSchema>;
 

@@ -1,12 +1,14 @@
 'use client';
 
-import type { CharacterDto, CharacterSheet } from '@rpg-ai/shared';
+import type { SystemDefinition, SystemValues } from '@rpg-ai/rules-engine';
+import type { CharacterDto, CharacterSheet, ChatMessageDto } from '@rpg-ai/shared';
 import { Alert, Button, Card, CardContent, cn, Field, Input, Textarea } from '@rpg-ai/ui';
 import { Minus, Plus, Trash2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { api, json } from '@/lib/api';
 import { accessToken } from '@/lib/supabase';
+import { normalizeValues, type RollTarget, safeCompute, SystemSheet } from './system-sheet';
 
 const EMPTY_SHEET: CharacterSheet = {
   attributes: [
@@ -32,10 +34,12 @@ function SheetEditor({
   initial,
   campaignId,
   onDone,
+  def,
 }: {
   initial: CharacterDto | null;
   campaignId: string;
   onDone: () => void;
+  def: SystemDefinition | null;
 }) {
   const router = useRouter();
   const readOnly = initial ? !initial.canEdit : false;
@@ -45,6 +49,43 @@ function SheetEditor({
   const [sheet, setSheet] = useState<CharacterSheet>(initial?.sheet ?? EMPTY_SHEET);
   const [error, setError] = useState<string>();
   const [saving, setSaving] = useState(false);
+  const [sys, setSys] = useState<SystemValues | undefined>(
+    def ? normalizeValues(def, initial?.sheet.system) : undefined,
+  );
+  const [rolling, setRolling] = useState<string | null>(null);
+  const [lastRoll, setLastRoll] = useState<{
+    label: string;
+    total: number;
+    expression: string;
+    notes: string[];
+  } | null>(null);
+
+  async function roll(t: RollTarget) {
+    if (!initial) return;
+    const k = 'skill' in t ? t.skill : t.attribute;
+    setRolling(k);
+    setError(undefined);
+    try {
+      const r = await api<{ message: ChatMessageDto; notes: string[] }>(
+        `/campaigns/${campaignId}/characters/${initial.id}/check`,
+        await accessToken(),
+        {
+          method: 'POST',
+          body: json(t),
+        },
+      );
+      setLastRoll({
+        label: r.message.roll!.label,
+        total: r.message.roll!.total,
+        expression: r.message.roll!.expression,
+        notes: r.notes,
+      });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Erro ao rolar');
+    } finally {
+      setRolling(null);
+    }
+  }
 
   const upd = <K extends keyof CharacterSheet>(k: K, v: CharacterSheet[K]) =>
     setSheet((s) => ({ ...s, [k]: v }));
@@ -58,6 +99,7 @@ function SheetEditor({
       resources: sheet.resources.filter((r) => r.label.trim()),
       inventory: sheet.inventory.filter((i) => i.name.trim()),
       notes: sheet.notes,
+      ...(sys ? { system: sys } : {}),
     };
     try {
       const token = await accessToken();
@@ -121,50 +163,191 @@ function SheetEditor({
           </Field>
         </div>
 
-        <section>
-          <SectionTitle
-            action={
-              !readOnly && (
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => upd('resources', [...sheet.resources, { label: '', current: 0, max: 0 }])}
-                >
-                  <Plus /> Recurso
-                </Button>
-              )
-            }
-          >
-            Recursos
-          </SectionTitle>
-          <div className="grid gap-2 sm:grid-cols-2">
-            {sheet.resources.map((r, i) => {
-              const set = (patch: Partial<typeof r>) =>
-                upd(
-                  'resources',
-                  sheet.resources.map((x, j) => (j === i ? { ...x, ...patch } : x)),
-                );
-              const pct = r.max > 0 ? Math.max(0, Math.min(100, (r.current / r.max) * 100)) : 0;
-              return (
-                <div key={i} className="space-y-2 rounded-lg border border-line bg-surface-2/50 p-3">
-                  <div className="flex items-center gap-2">
+        {def && sys ? (
+          <>
+            <SystemSheet
+              def={def}
+              value={sys}
+              onChange={setSys}
+              readOnly={readOnly}
+              onRoll={initial?.canEdit ? roll : undefined}
+              rolling={rolling}
+            />
+            {lastRoll && (
+              <Alert tone="info" title={`${lastRoll.label}: ${lastRoll.total}`}>
+                {lastRoll.expression} — também enviado para a crônica da mesa.
+                {lastRoll.notes.map((n) => (
+                  <span key={n} className="block text-gold-bright">
+                    {n}
+                  </span>
+                ))}
+              </Alert>
+            )}
+            {!initial && (
+              <p className="text-xs text-ink-faint">Salve a ficha para poder rolar os testes direto daqui.</p>
+            )}
+          </>
+        ) : (
+          <>
+            <section>
+              <SectionTitle
+                action={
+                  !readOnly && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() =>
+                        upd('resources', [...sheet.resources, { label: '', current: 0, max: 0 }])
+                      }
+                    >
+                      <Plus /> Recurso
+                    </Button>
+                  )
+                }
+              >
+                Recursos
+              </SectionTitle>
+              <div className="grid gap-2 sm:grid-cols-2">
+                {sheet.resources.map((r, i) => {
+                  const set = (patch: Partial<typeof r>) =>
+                    upd(
+                      'resources',
+                      sheet.resources.map((x, j) => (j === i ? { ...x, ...patch } : x)),
+                    );
+                  const pct = r.max > 0 ? Math.max(0, Math.min(100, (r.current / r.max) * 100)) : 0;
+                  return (
+                    <div key={i} className="space-y-2 rounded-lg border border-line bg-surface-2/50 p-3">
+                      <div className="flex items-center gap-2">
+                        <Input
+                          aria-label="Nome do recurso"
+                          value={r.label}
+                          onChange={(e) => set({ label: e.target.value })}
+                          placeholder="Vida, Mana…"
+                          className="h-8 text-sm"
+                          disabled={readOnly}
+                        />
+                        {!readOnly && (
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            aria-label="Remover recurso"
+                            onClick={() =>
+                              upd(
+                                'resources',
+                                sheet.resources.filter((_, j) => j !== i),
+                              )
+                            }
+                          >
+                            <Trash2 />
+                          </Button>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {!readOnly && (
+                          <Button
+                            size="icon"
+                            variant="secondary"
+                            aria-label={`Diminuir ${r.label}`}
+                            onClick={() => set({ current: r.current - 1 })}
+                          >
+                            <Minus />
+                          </Button>
+                        )}
+                        <Input
+                          aria-label={`${r.label} atual`}
+                          type="number"
+                          value={r.current}
+                          onChange={(e) => set({ current: Number(e.target.value) || 0 })}
+                          className="h-9 w-20 text-center"
+                          disabled={readOnly}
+                        />
+                        <span className="text-ink-faint">/</span>
+                        <Input
+                          aria-label={`${r.label} máximo`}
+                          type="number"
+                          min={0}
+                          value={r.max}
+                          onChange={(e) => set({ max: Math.max(0, Number(e.target.value) || 0) })}
+                          className="h-9 w-20 text-center"
+                          disabled={readOnly}
+                        />
+                        {!readOnly && (
+                          <Button
+                            size="icon"
+                            variant="secondary"
+                            aria-label={`Aumentar ${r.label}`}
+                            onClick={() => set({ current: r.current + 1 })}
+                          >
+                            <Plus />
+                          </Button>
+                        )}
+                      </div>
+                      <div className="h-1.5 overflow-hidden rounded-full bg-bg">
+                        <div
+                          className="h-full bg-gradient-to-r from-arcane-600 to-arcane-400 transition-all"
+                          style={{ width: `${pct}%` }}
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </section>
+
+            <section>
+              <SectionTitle
+                action={
+                  !readOnly && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => upd('attributes', [...sheet.attributes, { label: '', value: '' }])}
+                    >
+                      <Plus /> Atributo
+                    </Button>
+                  )
+                }
+              >
+                Atributos
+              </SectionTitle>
+              <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                {sheet.attributes.map((a, i) => (
+                  <div key={i} className="flex items-center gap-2">
                     <Input
-                      aria-label="Nome do recurso"
-                      value={r.label}
-                      onChange={(e) => set({ label: e.target.value })}
-                      placeholder="Vida, Mana…"
-                      className="h-8 text-sm"
+                      aria-label="Nome do atributo"
+                      value={a.label}
+                      placeholder="Atributo"
+                      onChange={(e) =>
+                        upd(
+                          'attributes',
+                          sheet.attributes.map((x, j) => (j === i ? { ...x, label: e.target.value } : x)),
+                        )
+                      }
+                      className="h-9"
+                      disabled={readOnly}
+                    />
+                    <Input
+                      aria-label={`Valor de ${a.label}`}
+                      value={a.value}
+                      placeholder="Valor"
+                      onChange={(e) =>
+                        upd(
+                          'attributes',
+                          sheet.attributes.map((x, j) => (j === i ? { ...x, value: e.target.value } : x)),
+                        )
+                      }
+                      className="h-9 w-24 text-center"
                       disabled={readOnly}
                     />
                     {!readOnly && (
                       <Button
                         size="icon"
                         variant="ghost"
-                        aria-label="Remover recurso"
+                        aria-label="Remover atributo"
                         onClick={() =>
                           upd(
-                            'resources',
-                            sheet.resources.filter((_, j) => j !== i),
+                            'attributes',
+                            sheet.attributes.filter((_, j) => j !== i),
                           )
                         }
                       >
@@ -172,122 +355,11 @@ function SheetEditor({
                       </Button>
                     )}
                   </div>
-                  <div className="flex items-center gap-2">
-                    {!readOnly && (
-                      <Button
-                        size="icon"
-                        variant="secondary"
-                        aria-label={`Diminuir ${r.label}`}
-                        onClick={() => set({ current: r.current - 1 })}
-                      >
-                        <Minus />
-                      </Button>
-                    )}
-                    <Input
-                      aria-label={`${r.label} atual`}
-                      type="number"
-                      value={r.current}
-                      onChange={(e) => set({ current: Number(e.target.value) || 0 })}
-                      className="h-9 w-20 text-center"
-                      disabled={readOnly}
-                    />
-                    <span className="text-ink-faint">/</span>
-                    <Input
-                      aria-label={`${r.label} máximo`}
-                      type="number"
-                      min={0}
-                      value={r.max}
-                      onChange={(e) => set({ max: Math.max(0, Number(e.target.value) || 0) })}
-                      className="h-9 w-20 text-center"
-                      disabled={readOnly}
-                    />
-                    {!readOnly && (
-                      <Button
-                        size="icon"
-                        variant="secondary"
-                        aria-label={`Aumentar ${r.label}`}
-                        onClick={() => set({ current: r.current + 1 })}
-                      >
-                        <Plus />
-                      </Button>
-                    )}
-                  </div>
-                  <div className="h-1.5 overflow-hidden rounded-full bg-bg">
-                    <div
-                      className="h-full bg-gradient-to-r from-arcane-600 to-arcane-400 transition-all"
-                      style={{ width: `${pct}%` }}
-                    />
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </section>
-
-        <section>
-          <SectionTitle
-            action={
-              !readOnly && (
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => upd('attributes', [...sheet.attributes, { label: '', value: '' }])}
-                >
-                  <Plus /> Atributo
-                </Button>
-              )
-            }
-          >
-            Atributos
-          </SectionTitle>
-          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-            {sheet.attributes.map((a, i) => (
-              <div key={i} className="flex items-center gap-2">
-                <Input
-                  aria-label="Nome do atributo"
-                  value={a.label}
-                  placeholder="Atributo"
-                  onChange={(e) =>
-                    upd(
-                      'attributes',
-                      sheet.attributes.map((x, j) => (j === i ? { ...x, label: e.target.value } : x)),
-                    )
-                  }
-                  className="h-9"
-                  disabled={readOnly}
-                />
-                <Input
-                  aria-label={`Valor de ${a.label}`}
-                  value={a.value}
-                  placeholder="Valor"
-                  onChange={(e) =>
-                    upd(
-                      'attributes',
-                      sheet.attributes.map((x, j) => (j === i ? { ...x, value: e.target.value } : x)),
-                    )
-                  }
-                  className="h-9 w-24 text-center"
-                  disabled={readOnly}
-                />
-                {!readOnly && (
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    aria-label="Remover atributo"
-                    onClick={() =>
-                      upd(
-                        'attributes',
-                        sheet.attributes.filter((_, j) => j !== i),
-                      )
-                    }
-                  >
-                    <Trash2 />
-                  </Button>
-                )}
+                ))}
               </div>
-            ))}
-          </div>
-        </section>
+            </section>
+          </>
+        )}
 
         <section>
           <SectionTitle
@@ -404,10 +476,12 @@ export function CharactersBoard({
   campaignId,
   characters,
   canCreate,
+  definition = null,
 }: {
   campaignId: string;
   characters: CharacterDto[];
   canCreate: boolean;
+  definition?: SystemDefinition | null;
 }) {
   const [editing, setEditing] = useState<CharacterDto | 'new' | null>(null);
   if (editing) {
@@ -417,6 +491,7 @@ export function CharactersBoard({
         initial={editing === 'new' ? null : editing}
         campaignId={campaignId}
         onDone={() => setEditing(null)}
+        def={definition}
       />
     );
   }
@@ -458,22 +533,29 @@ export function CharactersBoard({
                   </div>
                 </div>
                 <div className="space-y-1.5">
-                  {c.sheet.resources.slice(0, 3).map((r, i) => (
-                    <div key={i} className="flex items-center gap-2 text-xs">
-                      <span className="w-16 truncate text-ink-muted">{r.label}</span>
-                      <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-bg">
-                        <div
-                          className={cn('h-full', r.current <= r.max / 4 ? 'bg-blood' : 'bg-arcane-500')}
-                          style={{
-                            width: `${r.max ? Math.max(0, Math.min(100, (r.current / r.max) * 100)) : 0}%`,
-                          }}
-                        />
+                  {(definition && c.sheet.system
+                    ? safeCompute(definition, normalizeValues(definition, c.sheet.system)).resources.map(
+                        (r) => ({ label: r.abbr, current: r.current, max: r.max }),
+                      )
+                    : c.sheet.resources
+                  )
+                    .slice(0, 3)
+                    .map((r, i) => (
+                      <div key={i} className="flex items-center gap-2 text-xs">
+                        <span className="w-16 truncate text-ink-muted">{r.label}</span>
+                        <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-bg">
+                          <div
+                            className={cn('h-full', r.current <= r.max / 4 ? 'bg-blood' : 'bg-arcane-500')}
+                            style={{
+                              width: `${r.max ? Math.max(0, Math.min(100, (r.current / r.max) * 100)) : 0}%`,
+                            }}
+                          />
+                        </div>
+                        <span className="w-14 text-right tabular-nums text-ink">
+                          {r.current}/{r.max}
+                        </span>
                       </div>
-                      <span className="w-14 text-right tabular-nums text-ink">
-                        {r.current}/{r.max}
-                      </span>
-                    </div>
-                  ))}
+                    ))}
                 </div>
                 <p className="mt-3 text-xs text-arcane-300 opacity-0 transition-opacity group-hover:opacity-100">
                   {c.canEdit ? 'Abrir e editar' : 'Ver ficha'}
