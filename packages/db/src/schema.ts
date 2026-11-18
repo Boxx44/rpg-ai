@@ -4,6 +4,7 @@
  */
 import {
   bigint,
+  customType,
   boolean,
   integer,
   jsonb,
@@ -15,6 +16,7 @@ import {
 } from 'drizzle-orm/pg-core';
 
 const ts = (name: string) => timestamp(name, { withTimezone: true, mode: 'date' });
+const bytea = customType<{ data: Buffer; driverData: Buffer }>({ dataType: () => 'bytea' });
 
 export const users = pgTable('users', {
   id: uuid('id').primaryKey(),
@@ -122,6 +124,7 @@ export const characters = pgTable('characters', {
   color: text('color').notNull().default('#7c4ff0'),
   sheet: jsonb('sheet').notNull().default({}),
   version: integer('version').notNull().default(1),
+  portraitAsset: uuid('portrait_asset'),
   createdAt: ts('created_at').notNull().defaultNow(),
   updatedAt: ts('updated_at').notNull().defaultNow(),
   deletedAt: ts('deleted_at'),
@@ -136,6 +139,7 @@ export const npcs = pgTable('npcs', {
   publicDescription: text('public_description').notNull().default(''),
   color: text('color').notNull().default('#c9a24b'),
   revealed: boolean('revealed').notNull().default(false),
+  portraitAsset: uuid('portrait_asset'),
   createdAt: ts('created_at').notNull().defaultNow(),
   updatedAt: ts('updated_at').notNull().defaultNow(),
   deletedAt: ts('deleted_at'),
@@ -164,6 +168,8 @@ export const maps = pgTable('maps', {
   cellLabel: text('cell_label').notNull().default('1,5 m'),
   terrain: jsonb('terrain').$type<Record<string, string>>().notNull().default({}),
   shared: boolean('shared').notNull().default(false),
+  backgroundAsset: uuid('background_asset'),
+  gridVisible: boolean('grid_visible').notNull().default(true),
   createdAt: ts('created_at').notNull().defaultNow(),
   updatedAt: ts('updated_at').notNull().defaultNow(),
   deletedAt: ts('deleted_at'),
@@ -186,8 +192,24 @@ export const mapTokens = pgTable('map_tokens', {
   icon: text('icon'),
   state: text('state').$type<'open' | 'closed' | 'on' | 'off'>(),
   rotation: integer('rotation').notNull().default(0),
+  imageAsset: uuid('image_asset'),
   createdAt: ts('created_at').notNull().defaultNow(),
   updatedAt: ts('updated_at').notNull().defaultNow(),
+});
+
+/** Imagens (fundo de mapa, token, retrato), guardadas já reduzidas. */
+export const assets = pgTable('assets', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  campaignId: uuid('campaign_id').notNull(),
+  ownerId: uuid('owner_id').notNull(),
+  kind: text('kind').$type<'map' | 'token' | 'portrait'>().notNull(),
+  name: text('name').notNull().default(''),
+  mime: text('mime').$type<'image/png' | 'image/jpeg' | 'image/webp'>().notNull(),
+  width: integer('width').notNull(),
+  height: integer('height').notNull(),
+  bytes: integer('bytes').notNull(),
+  data: bytea('data').notNull(),
+  createdAt: ts('created_at').notNull().defaultNow(),
 });
 
 export const diceRolls = pgTable('dice_rolls', {

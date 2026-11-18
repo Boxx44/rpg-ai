@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { MAP_TEMPLATE_KEYS } from './map-templates';
 
 const text = (max: number) => z.string().trim().max(max);
 const name = (max: number) => z.string().trim().min(1).max(max);
@@ -139,6 +140,8 @@ export const updateCharacterSchema = z.object({
   concept: text(200).optional(),
   color: color.optional(),
   sheet: characterSheetSchema.optional(),
+  /** Imagem do retrato/token (enviada antes em /assets). */
+  portraitAsset: z.string().uuid().nullable().optional(),
   /** Versão que o cliente editou; evita sobrescrever alterações de outra pessoa. */
   version: z.number().int().positive(),
 });
@@ -154,6 +157,7 @@ export interface CharacterDto {
   color: string;
   sheet: CharacterSheet;
   version: number;
+  portraitAsset: string | null;
   canEdit: boolean;
   updatedAt: string;
 }
@@ -192,6 +196,7 @@ export const updateNpcSchema = z
     color: color.optional(),
     revealed: z.boolean().optional(),
     details: npcDetailsSchema.optional(),
+    portraitAsset: z.string().uuid().nullable().optional(),
   })
   .refine((v) => Object.keys(v).length > 0, { message: 'Nenhum campo para atualizar' });
 export type UpdateNpcInput = z.infer<typeof updateNpcSchema>;
@@ -204,6 +209,7 @@ export interface NpcDto {
   publicDescription: string;
   color: string;
   revealed: boolean;
+  portraitAsset: string | null;
   /** Presente apenas para o mestre. */
   details?: NpcDetails;
   updatedAt: string;
@@ -288,6 +294,18 @@ export const PROPS = {
 export type PropKind = keyof typeof PROPS;
 export const PROP_KINDS = Object.keys(PROPS) as PropKind[];
 export const PROP_STATE_LABELS = { open: 'aberta', closed: 'fechada', on: 'aceso', off: 'apagado' } as const;
+
+/** Palavra do estado combinando com o objeto: "porta aberta", "baú aberto", "computador ligado"… */
+export function propStateLabel(kind: PropKind, state: 'open' | 'closed' | 'on' | 'off' | null): string {
+  if (!state) return '';
+  const fem: PropKind[] = ['door', 'window', 'torch', 'campfire', 'trap'];
+  const f = fem.includes(kind);
+  if (kind === 'computer') return state === 'on' ? 'ligado' : 'desligado';
+  if (kind === 'ritual') return state === 'on' ? 'ativo' : 'apagado';
+  if (kind === 'trap') return state === 'on' ? 'armada' : 'desarmada';
+  const base = { open: 'abert', closed: 'fechad', on: 'aces', off: 'apagad' }[state];
+  return base + (f ? 'a' : 'o');
+}
 export type Terrain = (typeof TERRAINS)[number];
 
 export const createMapSchema = z.object({
@@ -295,6 +313,8 @@ export const createMapSchema = z.object({
   cols: z.number().int().min(4).max(100).default(24),
   rows: z.number().int().min(4).max(100).default(16),
   cellLabel: text(20).default('1,5 m'),
+  /** Começar a partir de um modelo pronto (casa abandonada, floresta…). */
+  template: z.enum(MAP_TEMPLATE_KEYS).optional(),
 });
 export type CreateMapInput = z.infer<typeof createMapSchema>;
 
@@ -305,6 +325,8 @@ export const updateMapSchema = z
     rows: z.number().int().min(4).max(100).optional(),
     cellLabel: text(20).optional(),
     shared: z.boolean().optional(),
+    backgroundAsset: z.string().uuid().nullable().optional(),
+    gridVisible: z.boolean().optional(),
   })
   .refine((v) => Object.keys(v).length > 0, { message: 'Nenhum campo para atualizar' });
 export type UpdateMapInput = z.infer<typeof updateMapSchema>;
@@ -345,6 +367,7 @@ export const createTokenSchema = z.object({
   /** Objeto do mapa: qual desenho (porta, baú, tocha…). */
   icon: z.enum(PROP_KINDS as [PropKind, ...PropKind[]]).optional(),
   rotation: z.union([z.literal(0), z.literal(90), z.literal(180), z.literal(270)]).optional(),
+  imageAsset: z.string().uuid().optional(),
 });
 export type CreateTokenInput = z.infer<typeof createTokenSchema>;
 
@@ -355,6 +378,7 @@ export const updateTokenSchema = z
     size: z.number().int().min(1).max(4).optional(),
     hidden: z.boolean().optional(),
     rotation: z.union([z.literal(0), z.literal(90), z.literal(180), z.literal(270)]).optional(),
+    imageAsset: z.string().uuid().nullable().optional(),
   })
   .refine((v) => Object.keys(v).length > 0, { message: 'Nenhum campo para atualizar' });
 export type UpdateTokenInput = z.infer<typeof updateTokenSchema>;
@@ -380,6 +404,10 @@ export interface TokenDto {
   icon: PropKind | null;
   state: 'open' | 'closed' | 'on' | 'off' | null;
   rotation: number;
+  /** Imagem própria do token (enviada pelo mestre). */
+  imageAsset: string | null;
+  /** Imagem a desenhar: a do token ou, se não houver, o retrato do personagem/NPC. */
+  image: string | null;
 }
 
 export interface MapSummaryDto {
@@ -388,10 +416,12 @@ export interface MapSummaryDto {
   cols: number;
   rows: number;
   shared: boolean;
+  backgroundAsset: string | null;
   updatedAt: string;
 }
 
 export interface MapDto extends MapSummaryDto {
+  gridVisible: boolean;
   campaignId: string;
   cellLabel: string;
   terrain: Record<string, Terrain>;
@@ -518,6 +548,8 @@ export interface CombatantDto {
   defeated: boolean;
   /** PV visíveis: personagens para todos; NPCs/inimigos só para o mestre. */
   hp: { current: number; max: number } | null;
+  /** Retrato (imagem enviada) do personagem ou NPC, se houver e se for visível. */
+  image: string | null;
   /** O usuário pode rolar Iniciativa / passar o turno por este combatente. */
   mine: boolean;
   /** Armas e rituais da ficha do NPC (só para o mestre), para agir no combate. */

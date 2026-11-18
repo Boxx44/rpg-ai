@@ -160,3 +160,5 @@ export function canManageCampaign(role: CampaignRole | null | undefined): boolea
 }
 export * from './game';
 export * from './systems';
+export * from './assets';
+export * from './map-templates';
