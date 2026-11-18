@@ -1,5 +1,6 @@
 'use client';
 
+import { ImagePicker } from './image-picker';
 import type { SystemDefinition, SystemValues } from '@rpg-ai/rules-engine';
 import type { NpcDetails, NpcDto } from '@rpg-ai/shared';
 import { Alert, Badge, Button, Card, CardContent, Field, Input, Textarea } from '@rpg-ai/ui';
@@ -56,6 +57,7 @@ export function NpcEditor({
     revealed: initial?.revealed ?? false,
   });
   const [d, setD] = useState<NpcDetails>({ ...EMPTY_DETAILS, ...(initial?.details ?? {}) });
+  const [portrait, setPortrait] = useState<string | null>(initial?.portraitAsset ?? null);
   const [sys, setSys] = useState<SystemValues | undefined>(
     def ? normalizeValues(def, d.sheet?.system) : undefined,
   );
@@ -85,7 +87,11 @@ export function NpcEditor({
       }
       const body = json(payload);
       const token = await accessToken();
-      if (initial) await api(`/campaigns/${campaignId}/npcs/${initial.id}`, token, { method: 'PATCH', body });
+      if (initial)
+        await api(`/campaigns/${campaignId}/npcs/${initial.id}`, token, {
+          method: 'PATCH',
+          body: json({ ...payload, portraitAsset: portrait }),
+        });
       else await api(`/campaigns/${campaignId}/npcs`, token, { method: 'POST', body });
       router.refresh();
       onDone();
@@ -113,6 +119,15 @@ export function NpcEditor({
   return (
     <Card>
       <CardContent className="space-y-6 pt-6" data-testid="npc-editor">
+        {initial && campaignId && !persist && (
+          <ImagePicker
+            campaignId={campaignId}
+            kind="portrait"
+            label="Retrato (jogadores só veem quando o NPC for revelado)"
+            value={portrait}
+            onChange={(id) => setPortrait(id)}
+          />
+        )}
         <div className="grid gap-4 sm:grid-cols-[1fr_auto]">
           <Field label="Nome" htmlFor="npc-name">
             <Input

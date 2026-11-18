@@ -43,46 +43,55 @@ export function PropArt({ kind, state }: { kind: PropKind; state: State }) {
     case 'door':
       return (
         <g>
-          <rect x="4" y="38" width="8" height="24" fill={woodDark} />
-          <rect x="88" y="38" width="8" height="24" fill={woodDark} />
+          {/* batentes */}
+          <rect x="2" y="40" width="10" height="20" rx="1" fill={woodDark} />
+          <rect x="88" y="40" width="10" height="20" rx="1" fill={woodDark} />
           {open ? (
             <>
+              {/* vão aberto: luz passando pelo chão */}
+              <rect x="12" y="45" width="76" height="10" fill="#e6c87f" opacity="0.18" />
               <path
-                d="M12 50 A 70 70 0 0 1 72 6"
+                d="M88 50 A 76 76 0 0 0 12 -26"
                 fill="none"
                 stroke={gold}
-                strokeOpacity="0.35"
-                strokeDasharray="4 4"
+                strokeOpacity="0.3"
+                strokeDasharray="3 4"
               />
-              <g transform="rotate(-80 12 50)">
+              {/* folha da porta girada 90° na dobradiça, com sombra */}
+              <g transform="rotate(-90 12 50)">
+                <rect x="14" y="47" width="76" height="12" rx="2" fill="rgba(0,0,0,0.35)" />
                 <rect
                   x="12"
-                  y="43"
+                  y="44"
                   width="76"
-                  height="14"
+                  height="12"
                   rx="2"
                   fill={wood}
                   stroke={woodDark}
                   strokeWidth="2"
                 />
-                <circle cx="80" cy="50" r="2.5" fill={gold} />
+                <line x1="37" y1="45" x2="37" y2="55" stroke={woodDark} strokeWidth="1.5" />
+                <line x1="62" y1="45" x2="62" y2="55" stroke={woodDark} strokeWidth="1.5" />
+                <circle cx="82" cy="50" r="2.5" fill={gold} />
               </g>
+              <circle cx="12" cy="50" r="3" fill={metal} />
             </>
           ) : (
             <g>
               <rect
                 x="12"
-                y="43"
+                y="44"
                 width="76"
-                height="14"
+                height="12"
                 rx="2"
                 fill={wood}
                 stroke={woodDark}
                 strokeWidth="2"
               />
-              <line x1="37" y1="44" x2="37" y2="56" stroke={woodDark} strokeWidth="1.5" />
-              <line x1="62" y1="44" x2="62" y2="56" stroke={woodDark} strokeWidth="1.5" />
+              <line x1="37" y1="45" x2="37" y2="55" stroke={woodDark} strokeWidth="1.5" />
+              <line x1="62" y1="45" x2="62" y2="55" stroke={woodDark} strokeWidth="1.5" />
               <circle cx="80" cy="50" r="2.5" fill={gold} />
+              <circle cx="12" cy="50" r="3" fill={metal} />
             </g>
           )}
         </g>

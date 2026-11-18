@@ -19,7 +19,7 @@ export async function api<T>(path: string, token: string, init: RequestInit = {}
       ...init,
       cache: 'no-store',
       headers: {
-        ...(init.body ? { 'Content-Type': 'application/json' } : {}),
+        ...(typeof init.body === 'string' ? { 'Content-Type': 'application/json' } : {}),
         Authorization: `Bearer ${token}`,
         ...init.headers,
       },

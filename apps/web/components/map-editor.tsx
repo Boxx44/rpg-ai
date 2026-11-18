@@ -6,6 +6,9 @@ import {
   type MapSummaryDto,
   type NpcDto,
   PROP_KINDS,
+  MAP_TEMPLATES,
+  type MapTemplateKey,
+  mapTemplate,
   PROPS,
   type PropKind,
   type Terrain,
@@ -19,7 +22,6 @@ import {
 import { Alert, Badge, Button, Card, CardContent, cn, Field, Input, Select } from '@rpg-ai/ui';
 import {
   Armchair,
-  Brush,
   Eraser,
   Eye,
   EyeOff,
@@ -36,6 +38,8 @@ import { api, json } from '@/lib/api';
 import { accessToken } from '@/lib/supabase';
 import { MapCanvas, TERRAIN_STYLE } from './map-canvas';
 import { PropArt } from './map-props';
+import { ImagePicker } from './image-picker';
+import { useAssetUrl } from '@/lib/assets';
 
 type Tool =
   | { kind: 'select' }
@@ -45,9 +49,35 @@ type Tool =
 
 const PROP_GROUPS = [...new Set(PROP_KINDS.map((k) => PROPS[k].group))];
 
+/** Miniatura de um modelo de mapa (só o terreno), para escolher antes de criar. */
+function TemplatePreview({ k }: { k: MapTemplateKey }) {
+  const t = mapTemplate(k);
+  return (
+    <svg viewBox={`0 0 ${t.cols} ${t.rows}`} className="h-16 w-full rounded bg-[#16131d]" aria-hidden>
+      {Object.entries(t.terrain).map(([key, tr]) => {
+        const [x, y] = key.split(',').map(Number) as [number, number];
+        return (
+          <rect
+            key={key}
+            x={x}
+            y={y}
+            width={1.02}
+            height={1.02}
+            fill={TERRAIN_STYLE[tr as Terrain]?.fill ?? '#333'}
+          />
+        );
+      })}
+      {t.props.map((p, i) => (
+        <circle key={i} cx={p.x + 0.5} cy={p.y + 0.5} r={0.35} fill="#e6c87f" opacity={0.8} />
+      ))}
+    </svg>
+  );
+}
+
 function NewMapForm({ campaignId, onCreated }: { campaignId: string; onCreated: (m: MapDto) => void }) {
   const [error, setError] = useState<string>();
   const [busy, setBusy] = useState(false);
+  const [template, setTemplate] = useState<MapTemplateKey | ''>('');
   return (
     <form
       className="grid gap-3 sm:grid-cols-[1fr_6rem_6rem_7rem_auto] sm:items-end"
@@ -61,8 +91,8 @@ function NewMapForm({ campaignId, onCreated }: { campaignId: string; onCreated: 
             method: 'POST',
             body: json({
               name: String(f.get('name')),
-              cols: Number(f.get('cols')),
-              rows: Number(f.get('rows')),
+              // com modelo, o tamanho vem do próprio modelo
+              ...(template ? { template } : { cols: Number(f.get('cols')), rows: Number(f.get('rows')) }),
               cellLabel: String(f.get('cell')),
             }),
           });
@@ -78,10 +108,26 @@ function NewMapForm({ campaignId, onCreated }: { campaignId: string; onCreated: 
         <Input id="map-name" name="name" required maxLength={80} placeholder="Ex.: Taverna do Corvo" />
       </Field>
       <Field label="Colunas" htmlFor="map-cols">
-        <Input id="map-cols" name="cols" type="number" min={4} max={100} defaultValue={24} />
+        <Input
+          id="map-cols"
+          name="cols"
+          type="number"
+          min={4}
+          max={100}
+          defaultValue={24}
+          disabled={!!template}
+        />
       </Field>
       <Field label="Linhas" htmlFor="map-rows">
-        <Input id="map-rows" name="rows" type="number" min={4} max={100} defaultValue={16} />
+        <Input
+          id="map-rows"
+          name="rows"
+          type="number"
+          min={4}
+          max={100}
+          defaultValue={16}
+          disabled={!!template}
+        />
       </Field>
       <Field label="Quadrado =" htmlFor="map-cell">
         <Input id="map-cell" name="cell" defaultValue="1,5 m" maxLength={20} />
@@ -89,6 +135,41 @@ function NewMapForm({ campaignId, onCreated }: { campaignId: string; onCreated: 
       <Button type="submit" loading={busy}>
         <Plus /> Criar mapa
       </Button>
+      <fieldset className="sm:col-span-5">
+        <legend className="mb-2 text-xs font-medium uppercase tracking-wider text-ink-faint">
+          Começar de um modelo pronto (opcional)
+        </legend>
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-6" role="radiogroup" aria-label="Modelo de mapa">
+          {(
+            [
+              { key: '', label: 'Em branco', description: 'Mapa vazio para você desenhar.' },
+              ...MAP_TEMPLATES,
+            ] as const
+          ).map((tp) => (
+            <button
+              key={tp.key || 'blank'}
+              type="button"
+              role="radio"
+              aria-checked={template === tp.key}
+              title={tp.description}
+              onClick={() => setTemplate(tp.key as MapTemplateKey | '')}
+              className={cn(
+                'space-y-1 rounded-lg border p-1.5 text-left text-xs transition-colors',
+                template === tp.key
+                  ? 'border-gold/70 bg-gold/10 text-gold-bright'
+                  : 'border-line text-ink-muted hover:text-ink',
+              )}
+            >
+              {tp.key ? (
+                <TemplatePreview k={tp.key as MapTemplateKey} />
+              ) : (
+                <div className="h-16 rounded bg-[#16131d]" />
+              )}
+              <span className="block truncate font-medium">{tp.label}</span>
+            </button>
+          ))}
+        </div>
+      </fieldset>
       {error && (
         <Alert tone="error" className="sm:col-span-5">
           {error}
@@ -148,6 +229,7 @@ export function MapEditor({
   }
 
   const base = map ? `/campaigns/${campaignId}/maps/${map.id}` : '';
+  const bgUrl = useAssetUrl(campaignId, map?.backgroundAsset);
 
   async function patchMap(body: object) {
     const m = await call((t) => api<MapDto>(base, t, { method: 'PATCH', body: json(body) }));
@@ -155,10 +237,41 @@ export function MapEditor({
       setMap(m);
       setMaps((list) =>
         list.map((x) =>
-          x.id === m.id ? { ...x, name: m.name, shared: m.shared, cols: m.cols, rows: m.rows } : x,
+          x.id === m.id
+            ? {
+                ...x,
+                name: m.name,
+                shared: m.shared,
+                cols: m.cols,
+                rows: m.rows,
+                backgroundAsset: m.backgroundAsset,
+              }
+            : x,
         ),
       );
       router.refresh();
+    }
+  }
+
+  /** Mantém as colunas e calcula as linhas pela proporção da imagem de fundo. */
+  async function fitGridToImage() {
+    if (!map?.backgroundAsset) return;
+    const url = bgUrl;
+    if (!url) return;
+    const img = new Image();
+    img.src = url;
+    await img.decode().catch(() => undefined);
+    if (!img.naturalWidth) return;
+    const rows = Math.max(4, Math.min(100, Math.round((map.cols * img.naturalHeight) / img.naturalWidth)));
+    await patchMap({ rows });
+  }
+
+  async function setTokenImage(t: TokenDto, imageAsset: string | null) {
+    await call((tk) => api(`${base}/tokens/${t.id}`, tk, { method: 'PATCH', body: json({ imageAsset }) }));
+    const m = await call((tk) => api<MapDto>(base, tk));
+    if (m) {
+      setMap(m);
+      setSelected(m.tokens.find((x) => x.id === t.id) ?? null);
     }
   }
 
@@ -287,6 +400,7 @@ export function MapEditor({
                   cols: m.cols,
                   rows: m.rows,
                   shared: m.shared,
+                  backgroundAsset: m.backgroundAsset,
                   updatedAt: m.updatedAt,
                 },
                 ...l,
@@ -637,6 +751,19 @@ export function MapEditor({
                     <b className="truncate">{selected.label}</b>
                     <span className="text-xs text-ink-faint">{TOKEN_KIND_LABELS[selected.kind]}</span>
                   </p>
+                  {!selected.icon && (
+                    <ImagePicker
+                      campaignId={campaignId}
+                      kind="token"
+                      label={
+                        selected.characterId || selected.npcId
+                          ? 'Imagem do token (no lugar do retrato)'
+                          : 'Imagem do token'
+                      }
+                      value={selected.imageAsset}
+                      onChange={(id) => setTokenImage(selected, id)}
+                    />
+                  )}
                   <div className="flex flex-wrap gap-2">
                     {selected.icon && (
                       <Button
@@ -675,10 +802,43 @@ export function MapEditor({
                 </CardContent>
               </Card>
             )}
-            <p className="flex items-start gap-2 text-xs text-ink-faint">
-              <Brush className="mt-0.5 size-3.5 shrink-0" />
-              Imagens de fundo para mapas chegam quando o armazenamento de arquivos for configurado.
-            </p>
+            <Card>
+              <CardContent className="space-y-3 pt-6" data-testid="background-panel">
+                <h3 className="text-xs font-semibold uppercase tracking-[0.15em] text-gold/80">
+                  Imagem de fundo
+                </h3>
+                <ImagePicker
+                  campaignId={campaignId}
+                  kind="map"
+                  label="Fundo do mapa"
+                  value={map.backgroundAsset}
+                  onChange={(id) => patchMap({ backgroundAsset: id })}
+                />
+                {map.backgroundAsset && (
+                  <div className="flex flex-wrap items-center gap-3 text-sm">
+                    <label className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={map.gridVisible}
+                        onChange={(e) => {
+                          setMap({ ...map, gridVisible: e.target.checked }); // resposta imediata na tela
+                          void patchMap({ gridVisible: e.target.checked });
+                        }}
+                        className="accent-[var(--color-gold)]"
+                      />
+                      Mostrar grade
+                    </label>
+                    <Button size="sm" variant="secondary" onClick={fitGridToImage} data-testid="fit-grid">
+                      Ajustar grade à imagem
+                    </Button>
+                  </div>
+                )}
+                <p className="text-xs text-ink-faint">
+                  Use um mapa desenhado ou uma foto. A grade fica por cima; &quot;Ajustar grade à imagem&quot;
+                  mantém as colunas e calcula as linhas para a imagem não ficar esticada.
+                </p>
+              </CardContent>
+            </Card>
           </aside>
         </div>
       )}

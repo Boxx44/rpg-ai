@@ -1,9 +1,18 @@
 'use client';
 
-import { gridDistance, type MapDto, PROPS, type Terrain, type TokenDto } from '@rpg-ai/shared';
+import {
+  gridDistance,
+  type MapDto,
+  PROPS,
+  propStateLabel,
+  type Terrain,
+  type TokenDto,
+} from '@rpg-ai/shared';
 import { cn, GameIcon } from '@rpg-ai/ui';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { PROP_LIGHT, PropArt } from './map-props';
+import { useAssetUrls } from '@/lib/assets';
+import { prefersLessMotion } from '@/lib/feedback';
 
 export const CELL = 40;
 
@@ -126,6 +135,21 @@ export function MapCanvas({
   const [painting, setPainting] = useState<Map<string, { x: number; y: number }> | null>(null);
   const [hover, setHover] = useState<string | null>(null);
   const floaters = useFloaters(decorations);
+  const urls = useAssetUrls(map.campaignId, [map.backgroundAsset, ...map.tokens.map((t) => t.image)]);
+  const bg = map.backgroundAsset ? urls[map.backgroundAsset] : undefined;
+
+  // Leva a vista até a peça da vez (ou a escolhida na barra de iniciativa).
+  const turnId = Object.entries(decorations ?? {}).find(([, d]) => d.turn)?.[0];
+  const focusId = selectedTokenId ?? turnId;
+  useEffect(() => {
+    if (!focusId) return;
+    const el = svgRef.current?.querySelector(`[data-token-id="${focusId}"]`);
+    el?.scrollIntoView?.({
+      block: 'nearest',
+      inline: 'nearest',
+      behavior: prefersLessMotion() ? 'auto' : 'smooth',
+    });
+  }, [focusId]);
 
   const toCell = useCallback((e: { clientX: number; clientY: number }) => {
     const svg = svgRef.current!;
@@ -340,6 +364,16 @@ export function MapCanvas({
           ))}
         </defs>
         <rect width={W} height={H} fill="#16131d" onPointerDown={onBoardDown} />
+        {bg && (
+          <image
+            href={bg}
+            width={W}
+            height={H}
+            preserveAspectRatio="xMidYMid slice"
+            pointerEvents="none"
+            data-testid="map-background"
+          />
+        )}
 
         {/* Terreno */}
         <g pointerEvents="none">
@@ -451,7 +485,12 @@ export function MapCanvas({
         </g>
 
         {/* Grade */}
-        <g pointerEvents="none" stroke="rgba(201,162,75,0.10)" strokeWidth={1}>
+        <g
+          pointerEvents="none"
+          stroke={bg ? 'rgba(255,255,255,0.18)' : 'rgba(201,162,75,0.10)'}
+          strokeWidth={1}
+          display={map.gridVisible === false ? 'none' : undefined}
+        >
           {Array.from({ length: map.cols + 1 }, (_, i) => (
             <line key={`v${i}`} x1={i * CELL} y1={0} x2={i * CELL} y2={H} />
           ))}
@@ -466,16 +505,7 @@ export function MapCanvas({
           const box = t.size * CELL;
           const canUse = usable(t) && !!onUseProp;
           const prop = PROPS[t.icon!];
-          const stateLabel =
-            t.state === 'open'
-              ? 'aberto'
-              : t.state === 'closed'
-                ? 'fechado'
-                : t.state === 'on'
-                  ? 'aceso'
-                  : t.state === 'off'
-                    ? 'apagado'
-                    : '';
+          const stateLabel = propStateLabel(t.icon!, t.state);
           return (
             <g
               key={t.id}
@@ -605,6 +635,7 @@ export function MapCanvas({
             <g
               key={t.id}
               data-testid="map-token"
+              data-token-id={t.id}
               data-label={t.label}
               data-x={pos.x}
               data-y={pos.y}
@@ -658,7 +689,28 @@ export function MapCanvas({
                   filter={down ? 'grayscale(1)' : undefined}
                   opacity={down ? 0.55 : 1}
                 />
-                <circle cx={r} cy={r} r={r - 4} fill="url(#g-token)" pointerEvents="none" />
+                {t.image && urls[t.image] ? (
+                  <>
+                    <clipPath id={`clip-tok-${t.id}`}>
+                      <circle cx={r} cy={r} r={r - 4} />
+                    </clipPath>
+                    <image
+                      href={urls[t.image]}
+                      x={4}
+                      y={4}
+                      width={2 * r - 8}
+                      height={2 * r - 8}
+                      preserveAspectRatio="xMidYMid slice"
+                      clipPath={`url(#clip-tok-${t.id})`}
+                      pointerEvents="none"
+                      opacity={down ? 0.45 : 1}
+                      style={down ? { filter: 'grayscale(1)' } : undefined}
+                      data-testid="token-image"
+                    />
+                  </>
+                ) : (
+                  <circle cx={r} cy={r} r={r - 4} fill="url(#g-token)" pointerEvents="none" />
+                )}
                 {/* anel de vida */}
                 <circle cx={r} cy={r} r={ringR} fill="none" stroke="rgba(0,0,0,0.5)" strokeWidth={3} />
                 <circle
@@ -678,18 +730,20 @@ export function MapCanvas({
                     <GameIcon name={t.kind} size={24} />
                   </g>
                 </g>
-                <text
-                  x={r}
-                  y={r + 5 * t.size}
-                  textAnchor="middle"
-                  fontSize={13 * t.size}
-                  fontWeight={700}
-                  fill="white"
-                  pointerEvents="none"
-                  style={{ fontFamily: 'var(--font-display)' }}
-                >
-                  {initials(t.label)}
-                </text>
+                {!(t.image && urls[t.image]) && (
+                  <text
+                    x={r}
+                    y={r + 5 * t.size}
+                    textAnchor="middle"
+                    fontSize={13 * t.size}
+                    fontWeight={700}
+                    fill="white"
+                    pointerEvents="none"
+                    style={{ fontFamily: 'var(--font-display)' }}
+                  >
+                    {initials(t.label)}
+                  </text>
+                )}
                 {down && (
                   <path
                     d={`M${r - 8} ${r - 8} L${r + 8} ${r + 8} M${r + 8} ${r - 8} L${r - 8} ${r + 8}`}

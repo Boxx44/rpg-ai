@@ -162,6 +162,7 @@ export function LibraryBoard({ sheets, campaigns }: { sheets: LibrarySheetDto[];
           publicDescription: s.npc.publicDescription,
           color: s.color,
           revealed: false,
+          portraitAsset: null,
           details: { ...s.npc.details, sheet: s.sheet },
           updatedAt: s.updatedAt,
         }
@@ -174,6 +175,7 @@ export function LibraryBoard({ sheets, campaigns }: { sheets: LibrarySheetDto[];
             publicDescription: editing.seed.concept,
             color: '#c9a24b',
             revealed: false,
+            portraitAsset: null,
             details: {
               personality: '',
               backstory: '',

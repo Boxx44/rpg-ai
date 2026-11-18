@@ -4,6 +4,8 @@ import type { SystemDefinition, SystemValues } from '@rpg-ai/rules-engine';
 import type { CharacterDto, CharacterSheet, ChatMessageDto } from '@rpg-ai/shared';
 import { Alert, Button, Card, CardContent, cn, Field, Input, Textarea } from '@rpg-ai/ui';
 import { Minus, Plus, Trash2 } from 'lucide-react';
+import { ImagePicker } from './image-picker';
+import { useAssetUrl } from '@/lib/assets';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { api, json } from '@/lib/api';
@@ -108,6 +110,7 @@ export function SheetEditor({
   const [name, setName] = useState(initial?.name ?? seed?.name ?? '');
   const [concept, setConcept] = useState(initial?.concept ?? seed?.concept ?? '');
   const [color, setColor] = useState(initial?.color ?? seed?.color ?? '#7c4ff0');
+  const [portrait, setPortrait] = useState<string | null>(initial?.portraitAsset ?? null);
   const [sheet, setSheet] = useState<CharacterSheet>(initial?.sheet ?? seed?.sheet ?? EMPTY_SHEET);
   const [error, setError] = useState<string>();
   const [saving, setSaving] = useState(false);
@@ -174,7 +177,14 @@ export function SheetEditor({
       if (initial)
         await api(`/campaigns/${campaignId}/characters/${initial.id}`, token, {
           method: 'PATCH',
-          body: json({ name, concept, color, sheet: clean, version: initial.version }),
+          body: json({
+            name,
+            concept,
+            color,
+            sheet: clean,
+            portraitAsset: portrait,
+            version: initial.version,
+          }),
         });
       else
         await api(`/campaigns/${campaignId}/characters`, token, {
@@ -207,6 +217,16 @@ export function SheetEditor({
   return (
     <Card>
       <CardContent className="space-y-6 pt-6" data-testid="character-editor">
+        {initial && campaignId && !persist && (
+          <ImagePicker
+            campaignId={campaignId}
+            kind="portrait"
+            label="Retrato (aparece no token e no combate)"
+            value={portrait}
+            onChange={(id) => setPortrait(id)}
+            className={readOnly ? 'pointer-events-none opacity-70' : undefined}
+          />
+        )}
         <div className="grid gap-4 sm:grid-cols-[1fr_1fr_auto]">
           <Field label={nameLabel} htmlFor="ch-name">
             <Input
@@ -551,6 +571,43 @@ export function SheetEditor({
   );
 }
 
+/** Bolinha com o retrato (ou a cor e as iniciais, se não houver imagem). */
+export function Avatar({
+  campaignId,
+  asset,
+  color,
+  name,
+  size = 'size-9',
+}: {
+  campaignId: string;
+  asset: string | null;
+  color: string;
+  name: string;
+  size?: string;
+}) {
+  const url = useAssetUrl(campaignId, asset);
+  return (
+    <span
+      className={cn(
+        'grid shrink-0 place-items-center overflow-hidden rounded-full border-2 border-black/40 text-xs font-bold text-white',
+        size,
+      )}
+      style={{ background: color }}
+      aria-hidden
+    >
+      {url ? (
+        <img src={url} alt="" className="size-full object-cover" />
+      ) : (
+        name
+          .split(/\s+/)
+          .slice(0, 2)
+          .map((p) => p[0]?.toUpperCase())
+          .join('')
+      )}
+    </span>
+  );
+}
+
 export function CharactersBoard({
   campaignId,
   characters,
@@ -600,10 +657,7 @@ export function CharactersBoard({
                 className="group block h-full w-full rounded-xl border border-line bg-surface/80 p-5 text-left transition-all hover:-translate-y-0.5 hover:border-arcane-500/50"
               >
                 <div className="mb-3 flex items-center gap-3">
-                  <span
-                    className="size-9 shrink-0 rounded-full border-2 border-black/40"
-                    style={{ background: c.color }}
-                  />
+                  <Avatar campaignId={campaignId} asset={c.portraitAsset} color={c.color} name={c.name} />
                   <div className="min-w-0">
                     <p className="truncate font-display tracking-wide text-ink">{c.name}</p>
                     <p className="truncate text-xs text-ink-faint">
