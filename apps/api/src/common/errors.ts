@@ -30,6 +30,15 @@ export const forbidden = (msg = 'Você não tem permissão para esta ação') =>
 export const unauthenticated = (msg = 'Autenticação necessária') =>
   new AppError(ERROR_CODES.UNAUTHENTICATED, msg, 401);
 
+/** Erros do gatilho que confere a imagem usada (outra campanha / enviada por outra pessoa). */
+export function assetRefError(e: unknown): never {
+  const err = e as { code?: string; cause?: { code?: string } };
+  const code = err.code ?? err.cause?.code;
+  if (code === '23503') throw new AppError(ERROR_CODES.VALIDATION, 'Imagem inválida para esta campanha', 400);
+  if (code === '42501') throw forbidden('Você só pode usar imagens que você enviou');
+  throw e;
+}
+
 /** Checagem estrutural: evita falhas quando ESM e CommonJS carregam cópias diferentes do zod. */
 function isZodError(e: unknown): e is ZodError {
   return (

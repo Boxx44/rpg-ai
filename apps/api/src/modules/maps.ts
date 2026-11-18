@@ -17,6 +17,7 @@ import {
   type CreateTokenInput,
   createTokenSchema,
   ERROR_CODES,
+  mapTemplate,
   PROPS,
   type PropKind,
   type MapDto,
@@ -32,7 +33,7 @@ import {
   updateTokenSchema,
   WS_EVENTS,
 } from '@rpg-ai/shared';
-import { AppError, forbidden, notFound } from '../common/errors';
+import { AppError, assetRefError, forbidden, notFound } from '../common/errors';
 import { Ctx, CurrentUser, parse, type RequestCtx } from '../common/http';
 import { type AuthUser, DB } from '../common/tokens';
 import { requireManager, requireMember, requirePlayer } from './access';
@@ -45,7 +46,7 @@ const t = schema.mapTokens;
 
 const outOfBounds = () => new AppError(ERROR_CODES.VALIDATION, 'Posição fora do mapa', 400);
 
-function toToken(r: typeof t.$inferSelect): TokenDto {
+function toToken(r: typeof t.$inferSelect, portrait: string | null = null): TokenDto {
   return {
     id: r.id,
     mapId: r.mapId,
@@ -62,6 +63,8 @@ function toToken(r: typeof t.$inferSelect): TokenDto {
     icon: (r.icon as PropKind | null) ?? null,
     state: r.state ?? null,
     rotation: r.rotation,
+    imageAsset: r.imageAsset,
+    image: r.imageAsset ?? portrait,
   };
 }
 
@@ -97,6 +100,7 @@ export class MapsService {
           cols: m.cols,
           rows: m.rows,
           shared: m.shared,
+          backgroundAsset: m.backgroundAsset,
           updatedAt: m.updatedAt,
         })
         .from(m)
@@ -108,7 +112,14 @@ export class MapsService {
 
   private async full(tx: Tx, cid: string, mapId: string): Promise<MapDto> {
     const map = await this.mapOf(tx, cid, mapId);
-    const tokens = await tx.select().from(t).where(eq(t.mapId, mapId)).orderBy(asc(t.createdAt));
+    // Retrato do personagem/NPC entra como imagem do token (RLS esconde NPC não revelado).
+    const tokens = await tx
+      .select({ t, cp: schema.characters.portraitAsset, np: schema.npcs.portraitAsset })
+      .from(t)
+      .leftJoin(schema.characters, eq(schema.characters.id, t.characterId))
+      .leftJoin(schema.npcs, eq(schema.npcs.id, t.npcId))
+      .where(eq(t.mapId, mapId))
+      .orderBy(asc(t.createdAt));
     return {
       id: map.id,
       campaignId: map.campaignId,
@@ -116,9 +127,11 @@ export class MapsService {
       cols: map.cols,
       rows: map.rows,
       shared: map.shared,
+      backgroundAsset: map.backgroundAsset,
+      gridVisible: map.gridVisible,
       cellLabel: map.cellLabel,
       terrain: map.terrain as Record<string, Terrain>,
-      tokens: tokens.map(toToken),
+      tokens: tokens.map((r) => toToken(r.t, r.cp ?? r.np ?? null)),
       updatedAt: map.updatedAt.toISOString(),
     };
   }
@@ -133,10 +146,37 @@ export class MapsService {
   async create(userId: string, cid: string, input: CreateMapInput, ctx: RequestCtx) {
     const dto = await withUser(this.db, userId, async (tx) => {
       await requireManager(tx, cid);
+      const { template, ...base } = input;
+      const tpl = template ? mapTemplate(template) : null;
       const [row] = await tx
         .insert(m)
-        .values({ campaignId: cid, createdBy: userId, ...input })
+        .values({
+          campaignId: cid,
+          createdBy: userId,
+          ...base,
+          ...(tpl ? { cols: tpl.cols, rows: tpl.rows, terrain: tpl.terrain } : {}),
+        })
         .returning({ id: m.id });
+      if (tpl?.props.length) {
+        await tx.insert(t).values(
+          tpl.props.map((p) => {
+            const def = PROPS[p.icon as PropKind];
+            return {
+              mapId: row!.id,
+              campaignId: cid,
+              kind: 'object' as const,
+              label: def.label,
+              color: '#6b6b6b',
+              x: p.x,
+              y: p.y,
+              size: def.size,
+              icon: p.icon,
+              rotation: p.rotation ?? 0,
+              state: (p.state ?? def.states[0] ?? null) as 'open' | 'closed' | 'on' | 'off' | null,
+            };
+          }),
+        );
+      }
       await audit(tx, ctx, {
         action: 'map.created',
         entityType: 'map',
@@ -156,7 +196,7 @@ export class MapsService {
       await requireManager(tx, cid);
       const cur = await this.mapOf(tx, cid, mapId);
       wasShared = cur.shared;
-      await tx.update(m).set(input).where(eq(m.id, mapId));
+      await tx.update(m).set(input).where(eq(m.id, mapId)).catch(assetRefError);
       // Mapa diminuiu: traz tokens que ficaram de fora para dentro.
       if ((input.cols ?? cur.cols) < cur.cols || (input.rows ?? cur.rows) < cur.rows) {
         await tx.execute(sql`select app_private.clamp_tokens(${mapId}::uuid)`);
@@ -254,7 +294,8 @@ export class MapsService {
           ...input,
           state: (prop?.states[0] as 'open' | 'closed' | 'on' | 'off' | undefined) ?? null,
         })
-        .returning();
+        .returning()
+        .catch(assetRefError);
       return toToken(row!);
     });
     this.notify(cid, mapId, shared && !token.hidden);
@@ -269,7 +310,8 @@ export class MapsService {
         .update(t)
         .set(input)
         .where(and(eq(t.id, tokenId), eq(t.mapId, mapId)))
-        .returning({ id: t.id });
+        .returning({ id: t.id })
+        .catch(assetRefError);
       if (!r.length) throw notFound('Token');
       return map.shared;
     });

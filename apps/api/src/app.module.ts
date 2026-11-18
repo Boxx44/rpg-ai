@@ -1,3 +1,4 @@
+import { AssetsController, AssetsService } from './modules/assets';
 import { type DynamicModule, type MiddlewareConsumer, Module, type NestModule } from '@nestjs/common';
 import { APP_FILTER, APP_GUARD } from '@nestjs/core';
 import type { Database } from '@rpg-ai/db';
@@ -57,6 +58,7 @@ export class AppModule implements NestModule {
         CombatController,
         LibraryController,
         SandboxController,
+        AssetsController,
       ],
       providers: [
         { provide: APP_CONFIG, useValue: deps.config },
@@ -64,6 +66,7 @@ export class AppModule implements NestModule {
         { provide: REDIS, useValue: deps.redis },
         { provide: LOGGER, useValue: deps.logger },
         JwtVerifier,
+        AssetsService,
         AuthService,
         CampaignsService,
         RealtimeGateway,

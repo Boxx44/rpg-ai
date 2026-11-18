@@ -28,7 +28,7 @@ import {
   WS_EVENTS,
 } from '@rpg-ai/shared';
 import type { z } from 'zod';
-import { AppError, notFound } from '../common/errors';
+import { AppError, assetRefError, notFound } from '../common/errors';
 import { Ctx, CurrentUser, parse, type RequestCtx } from '../common/http';
 import { type AuthUser, DB } from '../common/tokens';
 import { requireManager, requireMember } from './access';
@@ -113,6 +113,7 @@ export class NpcsService {
       appearance: r.appearance,
       publicDescription: r.publicDescription,
       color: r.color,
+      portraitAsset: r.portraitAsset,
       revealed: r.revealed,
       ...(manager
         ? { details: npcDetailsSchema.parse(det ? { ...det, stats: det.stats, sheet: det.sheet ?? {} } : {}) }
@@ -160,7 +161,7 @@ export class NpcsService {
       if (!cur) throw notFound('NPC');
       const { details, ...base } = input;
       if (details) details.sheet = await sheetForCampaign(this.systems, tx, cid, details.sheet);
-      if (Object.keys(base).length) await tx.update(n).set(base).where(eq(n.id, id));
+      if (Object.keys(base).length) await tx.update(n).set(base).where(eq(n.id, id)).catch(assetRefError);
       if (details) await tx.update(d).set(details).where(eq(d.npcId, id));
       await audit(tx, ctx, {
         action: 'npc.updated',

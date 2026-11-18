@@ -184,7 +184,7 @@ export class CombatService {
     const charIds = rows.map((r) => r.c.characterId).filter((x): x is string => !!x);
     const chars = charIds.length
       ? await tx
-          .select({ id: ch.id, ownerId: ch.ownerId, sheet: ch.sheet })
+          .select({ id: ch.id, ownerId: ch.ownerId, sheet: ch.sheet, portrait: ch.portraitAsset })
           .from(ch)
           .where(and(inArray(ch.id, charIds), isNull(ch.deletedAt)))
       : [];
@@ -197,6 +197,14 @@ export class CombatService {
     const def = await this.definition(tx, cid);
     const npcIds = manager ? [...new Set(rows.map((r) => r.c.npcId).filter((x): x is string => !!x))] : [];
     const npcSheets = await this.npcSheets(tx, cid, npcIds);
+    // Retratos de NPC: o RLS só devolve NPCs que esta pessoa pode ver.
+    const allNpcIds = [...new Set(rows.map((r) => r.c.npcId).filter((x): x is string => !!x))];
+    const npcPortraits = allNpcIds.length
+      ? await tx
+          .select({ id: schema.npcs.id, portrait: schema.npcs.portraitAsset })
+          .from(schema.npcs)
+          .where(inArray(schema.npcs.id, allNpcIds))
+      : [];
     const combatants: CombatantDto[] = rows.map(({ c }) => {
       const owner = chars.find((x) => x.id === c.characterId);
       let hp: CombatantDto['hp'] = null;
@@ -224,6 +232,7 @@ export class CombatService {
         hidden: c.hidden,
         defeated: c.defeated,
         hp,
+        image: owner?.portrait ?? npcPortraits.find((x) => x.id === c.npcId)?.portrait ?? null,
         mine: manager || owner?.ownerId === userId,
         creature: manager && c.creatureKey ? creatureInfo(def, c.creatureKey) : null,
         npcSheet: manager && c.npcId ? npcActions(def, npcSheets.get(c.npcId)) : null,

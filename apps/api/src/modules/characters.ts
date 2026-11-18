@@ -30,7 +30,7 @@ import {
   WS_EVENTS,
 } from '@rpg-ai/shared';
 import type { z } from 'zod';
-import { AppError, forbidden, notFound } from '../common/errors';
+import { AppError, assetRefError, forbidden, notFound } from '../common/errors';
 import { Ctx, CurrentUser, parse, type RequestCtx } from '../common/http';
 import { type AuthUser, DB } from '../common/tokens';
 import { requireMember, requirePlayer } from './access';
@@ -198,6 +198,7 @@ export class CharactersService {
       name: c.name,
       concept: c.concept,
       color: c.color,
+      portraitAsset: c.portraitAsset,
       sheet: characterSheetSchema.parse(c.sheet),
       version: c.version,
       canEdit: c.ownerId === userId || canManageCampaign(role),
@@ -247,7 +248,8 @@ export class CharactersService {
         .update(ch)
         .set({ ...changes, version: sql`${ch.version} + 1` })
         .where(and(eq(ch.id, id), eq(ch.version, version)))
-        .returning({ id: ch.id });
+        .returning({ id: ch.id })
+        .catch(assetRefError);
       if (!r.length)
         throw new AppError(
           ERROR_CODES.CONFLICT,
