@@ -9,6 +9,15 @@
 
 ---
 
+## 18/11/2026 — Ajuda na criação de personagem
+
+**O que funciona (testado):**
+- **Criação guiada:** um "Ajudante" explica cada passo em linguagem simples e com a página do livro. Ao passar o mouse sobre um atributo, perícia, classe, arma ou ritual, ele explica o que aquilo faz. A origem escolhida mostra o poder que concede.
+- **Ficha completa:** um "?" ao lado de cada atributo, perícia, recurso (PV/PE/SAN), Defesa, NEX, limite de PE, DT, carga, classe e origem. Ao tocar, aparece a explicação.
+- **Ligar e desligar:** o botão "Ajuda ligada/desligada" fica lembrado neste navegador.
+
+**Testes:** rules-engine 57, shared 8, banco 45, API 76 e ponta a ponta 38, todos passando, além de lint e typecheck sem erros.
+
 ## 18/11/2026 — Fichas, mesa de treino e regras completas
 
 **O que funciona (testado):**

@@ -16,6 +16,7 @@ import {
   OP_RITUALS,
   OP_WEAPONS,
 } from './ordem-paranormal-data';
+import { OP_HELP } from './ordem-paranormal-help';
 
 const nexValues = [5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 90, 95, 99];
 /** Nível de exposição: 5% = 1 ... 95% = 19, 99% = 20. */
@@ -634,6 +635,7 @@ export const ORDEM_PARANORMAL: SystemDefinition = {
       },
     },
   },
+  help: OP_HELP,
   classes: OP_CLASSES,
   powers: OP_POWERS,
   creatures: [...OP_CREATURES, ...OP_MUNDANE],

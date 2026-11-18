@@ -145,3 +145,16 @@ describe('regras completadas', () => {
     expect(full.gains.every((g) => g.amount === 0)).toBe(true);
   });
 });
+
+describe('ajuda para iniciantes', () => {
+  it('explica todo atributo, perícia, origem e classe do sistema', () => {
+    const h = def.help!;
+    for (const a of def.attributes) expect(h.attributes[a.key]).toBeTruthy();
+    for (const s of def.skills) expect(h.skills[s.key]).toBeTruthy();
+    for (const o of def.fields.find((f) => f.key === 'origem')!.options!)
+      expect(h.origins[String(o.value)]?.power).toBeTruthy();
+    for (const c of def.classes) expect(h.classes[c.key]).toBeTruthy();
+    for (const r of def.resources) expect(h.terms[r.key]).toBeTruthy();
+    for (const d of def.derived) expect(h.terms[d.key]).toBeTruthy();
+  });
+});

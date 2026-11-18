@@ -189,3 +189,17 @@ Não é necessário agora, mas o custo da IA é variável (ver risks.md). A arqu
   - dormir recupera PV e PE e relaxar recupera SAN, ambos iguais ao limite de PE × condição (½, 1, 2 ou 3);
   - refeições aumentam um nível ou somam +2 SAN;
   - relaxar junto dá +1 por participante.
+
+**ADR-033 — Ajuda para iniciantes na criação de personagem.**
+- O sistema ganhou uma seção opcional `help`, com textos escritos com palavras próprias e conferidos no livro, sempre com a página:
+  - explicação de cada passo da criação;
+  - os 5 atributos;
+  - as 28 perícias;
+  - as 26 origens, com o poder de cada uma;
+  - as 3 classes;
+  - os termos da ficha: PV, PE, SAN, Defesa, NEX, limite de PE, DT de rituais, carga, trilha e grau de treinamento.
+- Não há regra nova; os textos só explicam o que o modelo já aplica. Um teste garante que todo atributo, perícia, origem, classe e número da ficha tem explicação.
+- Na criação guiada, um "Ajudante" ao lado explica o passo atual e o item sob o mouse ou foco. A origem mostra o poder que concede.
+- Na ficha completa há um "?" em cada item; o balão fica fixo na tela, para não ser cortado em listas.
+- A ajuda pode ser desligada, e a preferência fica guardada no navegador.
+- O botão "?" usa o rótulo genérico "Mais informações", para não competir com o rótulo do campo ao lado (acessibilidade e testes).

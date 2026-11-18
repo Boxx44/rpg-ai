@@ -72,15 +72,22 @@ test('biblioteca: criação guiada passo a passo e levar para a campanha', async
   await expect(page.getByRole('heading', { name: 'Fichas' })).toBeVisible();
   await page.getByRole('button', { name: 'Criação guiada' }).click();
   const g = page.getByTestId('guided-creator');
+  // O ajudante explica cada passo e o que estiver em foco.
+  await expect(page.getByTestId('helper')).toContainText('Quem é o seu personagem?');
   await g.getByLabel('Nome do personagem').fill('Bia Torres');
   await g.getByLabel('Conceito').fill('Hacker que viu demais');
   await page.getByRole('button', { name: 'Próximo' }).click();
+  await expect(page.getByTestId('helper')).toContainText('Atributos');
+  await page.getByTestId('g-attr-AGI').hover();
+  await expect(page.getByTestId('helper-focus')).toContainText('Defesa');
   for (const a of ['Agilidade', 'Agilidade', 'Intelecto', 'Presença'])
     await page.getByRole('button', { name: `Aumentar ${a}` }).click();
   await expect(page.getByTestId('g-points-left')).toHaveText('Pontos distribuídos.');
   await page.getByRole('button', { name: 'Próximo' }).click();
+  await expect(page.getByTestId('origin-power')).toContainText('Poder:');
   await page.getByRole('button', { name: 'Próximo' }).click();
   await page.getByRole('button', { name: /^Especialista/ }).click();
+  await expect(page.getByRole('button', { name: /^Especialista/ })).toContainText('faz-tudo');
   await page.getByRole('button', { name: 'Próximo' }).click();
   await expect(page.getByTestId('g-free-count')).toHaveText('0/9');
   for (let i = 0; i < 9; i++)
@@ -93,6 +100,10 @@ test('biblioteca: criação guiada passo a passo e levar para a campanha', async
   await expect(page.getByTestId('g-review')).toContainText('Pistola');
   await page.getByRole('button', { name: 'Criar ficha' }).click();
   await expect(page.getByTestId('weapon-row')).toContainText('Pistola');
+  // Na ficha completa, o "?" explica cada número.
+  await page.getByTestId('derived-defesa').getByTitle('O que é Defesa?').click();
+  await expect(page.getByTestId('help-bubble')).toContainText('10 + Agilidade');
+  await page.screenshot({ path: 'test-results/screens/help-bubble.png' });
   await page.getByRole('button', { name: 'Salvar ficha' }).click();
   const card = page.getByTestId('library-card').filter({ hasText: 'Bia Torres' });
   await expect(card).toBeVisible();

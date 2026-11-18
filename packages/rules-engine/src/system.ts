@@ -287,6 +287,21 @@ export const systemDefinitionSchema = z.object({
       ),
     })
     .optional(),
+  /** Ajuda para iniciantes: explicações em linguagem simples (sem regras novas). */
+  help: z
+    .object({
+      steps: z
+        .record(z.object({ title: z.string().max(80), text: z.string().max(600), page: page.optional() }))
+        .default({}),
+      attributes: z.record(z.string().max(300)).default({}),
+      skills: z.record(z.string().max(200)).default({}),
+      origins: z.record(z.object({ power: z.string().max(60), text: z.string().max(300), page })).default({}),
+      classes: z.record(z.string().max(300)).default({}),
+      terms: z
+        .record(z.object({ label: z.string().max(60), text: z.string().max(300), page: page.optional() }))
+        .default({}),
+    })
+    .optional(),
   /** Interlúdio: descanso entre cenas (dormir recupera PV/PE, relaxar recupera SAN). */
   rest: z
     .object({
