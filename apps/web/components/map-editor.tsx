@@ -5,6 +5,9 @@ import {
   type MapDto,
   type MapSummaryDto,
   type NpcDto,
+  PROP_KINDS,
+  PROPS,
+  type PropKind,
   type Terrain,
   TERRAIN_LABELS,
   TERRAINS,
@@ -14,14 +17,33 @@ import {
   type TokenKind,
 } from '@rpg-ai/shared';
 import { Alert, Badge, Button, Card, CardContent, cn, Field, Input, Select } from '@rpg-ai/ui';
-import { Brush, Eraser, Eye, EyeOff, MousePointer2, Plus, Trash2, UserPlus } from 'lucide-react';
+import {
+  Armchair,
+  Brush,
+  Eraser,
+  Eye,
+  EyeOff,
+  MousePointer2,
+  Plus,
+  Power,
+  RotateCw,
+  Trash2,
+  UserPlus,
+} from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 import { api, json } from '@/lib/api';
 import { accessToken } from '@/lib/supabase';
 import { MapCanvas, TERRAIN_STYLE } from './map-canvas';
+import { PropArt } from './map-props';
 
-type Tool = { kind: 'select' } | { kind: 'paint'; terrain: Terrain | null } | { kind: 'token' };
+type Tool =
+  | { kind: 'select' }
+  | { kind: 'paint'; terrain: Terrain | null }
+  | { kind: 'token' }
+  | { kind: 'prop'; prop: PropKind };
+
+const PROP_GROUPS = [...new Set(PROP_KINDS.map((k) => PROPS[k].group))];
 
 function NewMapForm({ campaignId, onCreated }: { campaignId: string; onCreated: (m: MapDto) => void }) {
   const [error, setError] = useState<string>();
@@ -102,6 +124,7 @@ export function MapEditor({
   });
   const [error, setError] = useState<string>();
   const [zoom, setZoom] = useState(1);
+  const [propRotation, setPropRotation] = useState<0 | 90 | 180 | 270>(0);
 
   const open = useCallback(
     async (id: string) => {
@@ -162,6 +185,46 @@ export function MapEditor({
       }),
     );
     if (t) setMap({ ...map, tokens: [...map.tokens, t] });
+  }
+
+  /** Coloca um objeto (porta, baú, tocha…) na casa clicada. */
+  async function placeProp(x: number, y: number) {
+    if (!map || tool.kind !== 'prop') return;
+    const def = PROPS[tool.prop];
+    const t = await call((tk) =>
+      api<TokenDto>(`${base}/tokens`, tk, {
+        method: 'POST',
+        body: json({
+          kind: 'object',
+          label: def.label,
+          color: '#6b6b6b',
+          size: def.size,
+          hidden: tokenForm.hidden,
+          icon: tool.prop,
+          rotation: propRotation,
+          x: Math.max(0, Math.min(x, map.cols - def.size)),
+          y: Math.max(0, Math.min(y, map.rows - def.size)),
+        }),
+      }),
+    );
+    if (t) setMap({ ...map, tokens: [...map.tokens, t] });
+  }
+
+  async function rotate(t: TokenDto) {
+    const rotation = ((t.rotation + 90) % 360) as 0 | 90 | 180 | 270;
+    await call((tk) => api(`${base}/tokens/${t.id}`, tk, { method: 'PATCH', body: json({ rotation }) }));
+    if (map) setMap({ ...map, tokens: map.tokens.map((k) => (k.id === t.id ? { ...k, rotation } : k)) });
+    setSelected({ ...t, rotation });
+  }
+
+  async function toggleProp(t: TokenDto) {
+    const r = await call((tk) =>
+      api<{ state: TokenDto['state'] }>(`${base}/tokens/${t.id}/toggle`, tk, { method: 'POST' }),
+    );
+    if (!r) return;
+    if (map)
+      setMap({ ...map, tokens: map.tokens.map((k) => (k.id === t.id ? { ...k, state: r.state } : k)) });
+    setSelected({ ...t, state: r.state });
   }
 
   async function onPaint(cells: { x: number; y: number }[]) {
@@ -295,6 +358,14 @@ export function MapEditor({
               >
                 <UserPlus className="size-3.5" /> Colocar token
               </button>
+              <button
+                type="button"
+                className={toolBtn(tool.kind === 'prop')}
+                onClick={() => setTool({ kind: 'prop', prop: tool.kind === 'prop' ? tool.prop : 'door' })}
+                data-testid="tool-props"
+              >
+                <Armchair className="size-3.5" /> Objetos
+              </button>
               <span className="ml-auto flex items-center gap-1 text-xs text-ink-muted">
                 <Button
                   size="sm"
@@ -322,7 +393,7 @@ export function MapEditor({
               canMove={() => tool.kind === 'select'}
               onMove={onMove}
               paint={tool.kind === 'paint' ? { terrain: tool.terrain, onPaint } : undefined}
-              onCellClick={tool.kind === 'token' ? placeToken : undefined}
+              onCellClick={tool.kind === 'token' ? placeToken : tool.kind === 'prop' ? placeProp : undefined}
               selectedTokenId={selected?.id}
               onSelectToken={(t) => setSelected(t)}
             />
@@ -331,7 +402,9 @@ export function MapEditor({
                 ? 'Clique ou arraste sobre o mapa para pintar.'
                 : tool.kind === 'token'
                   ? 'Clique numa casa para colocar o token.'
-                  : 'Arraste tokens para movê-los. Clique para selecionar.'}
+                  : tool.kind === 'prop'
+                    ? `Clique numa casa para colocar: ${PROPS[tool.prop].label}.`
+                    : 'Arraste tokens para movê-los. Clique para selecionar.'}
             </p>
             {error && <Alert tone="error">{error}</Alert>}
           </div>
@@ -499,6 +572,63 @@ export function MapEditor({
               </Card>
             )}
 
+            {tool.kind === 'prop' && (
+              <Card>
+                <CardContent
+                  className="max-h-[60vh] space-y-3 overflow-y-auto pt-6"
+                  data-testid="prop-palette"
+                >
+                  <h3 className="text-xs font-semibold uppercase tracking-[0.15em] text-gold/80">Objetos</h3>
+                  {PROP_GROUPS.map((g) => (
+                    <div key={g}>
+                      <p className="mb-1 text-xs text-ink-faint">{g}</p>
+                      <div className="grid grid-cols-4 gap-1.5">
+                        {PROP_KINDS.filter((k) => PROPS[k].group === g).map((k) => (
+                          <button
+                            key={k}
+                            type="button"
+                            title={PROPS[k].label}
+                            aria-label={PROPS[k].label}
+                            aria-pressed={tool.prop === k}
+                            onClick={() => setTool({ kind: 'prop', prop: k })}
+                            className={cn(
+                              'flex flex-col items-center gap-0.5 rounded-md border p-1 text-[10px] leading-tight transition-colors',
+                              tool.prop === k
+                                ? 'border-gold/70 bg-gold/10 text-gold-bright'
+                                : 'border-line text-ink-muted hover:border-arcane-500/60 hover:text-ink',
+                            )}
+                          >
+                            <svg viewBox="0 0 100 100" className="size-9 rounded bg-[#2a2433]" aria-hidden>
+                              <PropArt kind={k} state={(PROPS[k].states[0] as TokenDto['state']) ?? null} />
+                            </svg>
+                            <span className="w-full truncate">{PROPS[k].label}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                  <div className="flex items-center gap-3 text-sm">
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={() => setPropRotation((r) => ((r + 90) % 360) as 0 | 90 | 180 | 270)}
+                    >
+                      <RotateCw /> Girar ({propRotation}°)
+                    </Button>
+                    <label className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={tokenForm.hidden}
+                        onChange={(e) => setTokenForm({ ...tokenForm, hidden: e.target.checked })}
+                        className="accent-[var(--color-gold)]"
+                      />
+                      Oculto
+                    </label>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
             {selected && (
               <Card>
                 <CardContent className="space-y-3 pt-6">
@@ -507,7 +637,28 @@ export function MapEditor({
                     <b className="truncate">{selected.label}</b>
                     <span className="text-xs text-ink-faint">{TOKEN_KIND_LABELS[selected.kind]}</span>
                   </p>
-                  <div className="flex gap-2">
+                  <div className="flex flex-wrap gap-2">
+                    {selected.icon && (
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        onClick={() => rotate(selected)}
+                        aria-label="Girar objeto"
+                      >
+                        <RotateCw />
+                      </Button>
+                    )}
+                    {selected.state && (
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        onClick={() => toggleProp(selected)}
+                        data-testid="use-prop"
+                      >
+                        <Power />{' '}
+                        {{ closed: 'Abrir', open: 'Fechar', off: 'Acender', on: 'Apagar' }[selected.state]}
+                      </Button>
+                    )}
                     <Button size="sm" variant="secondary" onClick={() => toggleHidden(selected)}>
                       {selected.hidden ? <Eye /> : <EyeOff />}
                       {selected.hidden ? 'Revelar' : 'Ocultar'}

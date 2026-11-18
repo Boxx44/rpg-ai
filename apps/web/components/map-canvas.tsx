@@ -1,24 +1,30 @@
 'use client';
 
-import { gridDistance, type MapDto, type Terrain, type TokenDto } from '@rpg-ai/shared';
+import { gridDistance, type MapDto, PROPS, type Terrain, type TokenDto } from '@rpg-ai/shared';
 import { cn, GameIcon } from '@rpg-ai/ui';
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { PROP_LIGHT, PropArt } from './map-props';
 
 export const CELL = 40;
 
-export const TERRAIN_STYLE: Record<
-  Terrain,
-  { fill: string; stroke?: string; pattern?: 'dots' | 'waves' | 'tree' | 'door' }
-> = {
-  floor: { fill: '#2a2433' },
-  wall: { fill: '#0c0a10', stroke: '#5c4a2a' },
-  door: { fill: '#3a2a18', pattern: 'door' },
-  water: { fill: '#173451', pattern: 'waves' },
-  grass: { fill: '#1f3a25', pattern: 'dots' },
-  sand: { fill: '#5a4a2e', pattern: 'dots' },
-  rock: { fill: '#38343f' },
-  lava: { fill: '#6e2410', pattern: 'waves' },
-  tree: { fill: '#1f3a25', pattern: 'tree' },
+/** Cor base de cada terreno (também usada nas amostras da paleta do editor) + textura. */
+export const TERRAIN_STYLE: Record<Terrain, { fill: string; pattern?: string }> = {
+  floor: { fill: '#2a2433', pattern: 'p-floor' },
+  wall: { fill: '#1a1620', pattern: 'p-brick' },
+  door: { fill: '#3a2a18' },
+  water: { fill: '#173451' },
+  grass: { fill: '#22432a', pattern: 'p-grass' },
+  sand: { fill: '#6b5935', pattern: 'p-sand' },
+  rock: { fill: '#3a3641', pattern: 'p-rock' },
+  lava: { fill: '#7a2a10' },
+  tree: { fill: '#22432a', pattern: 'p-grass' },
+  wood: { fill: '#5a3d22', pattern: 'p-wood' },
+  stone: { fill: '#4a4652', pattern: 'p-stone' },
+  carpet: { fill: '#5a1f2e', pattern: 'p-carpet' },
+  road: { fill: '#2b2c30', pattern: 'p-road' },
+  dirt: { fill: '#4a3624', pattern: 'p-sand' },
+  snow: { fill: '#d9e3ec', pattern: 'p-snow' },
+  tile: { fill: '#c9cfd6', pattern: 'p-tile' },
 };
 
 /** "1,5 m" → distância formatada para N quadrados (ou só os quadrados se não der para converter). */
@@ -32,6 +38,16 @@ export function formatDistance(cells: number, cellLabel: string): string {
   return `${q} · ${v} ${m[2]}`.trim();
 }
 
+/** Informações extras de cada peça vindas da mesa (vida, vez do turno…). */
+export interface TokenDecoration {
+  /** Vida atual/máxima (só quando quem olha pode ver). */
+  hp?: { current: number; max: number };
+  /** Estado de saúde sem números (inimigos para jogadores). */
+  health?: 'ok' | 'hurt' | 'down';
+  turn?: boolean;
+  conditions?: number;
+}
+
 export interface MapCanvasProps {
   map: MapDto;
   /** Pode arrastar este token? */
@@ -42,6 +58,9 @@ export interface MapCanvasProps {
   onCellClick?: (x: number, y: number) => void;
   selectedTokenId?: string | null;
   onSelectToken?: (t: TokenDto) => void;
+  /** Usar objeto (abrir porta, acender tocha). */
+  onUseProp?: (t: TokenDto) => void;
+  decorations?: Record<string, TokenDecoration>;
   zoom?: number;
   className?: string;
 }
@@ -55,6 +74,33 @@ function initials(label: string) {
     .join('');
 }
 
+const isProp = (t: TokenDto) => t.kind === 'object' && !!t.icon;
+const usable = (t: TokenDto) => isProp(t) && t.state !== null;
+
+/** Números de dano/cura que sobem da peça quando a vida muda. */
+function useFloaters(decorations?: Record<string, TokenDecoration>) {
+  const prev = useRef<Record<string, number>>({});
+  const [floaters, setFloaters] = useState<{ id: number; tokenId: string; delta: number }[]>([]);
+  useEffect(() => {
+    if (!decorations) return;
+    const add: { id: number; tokenId: string; delta: number }[] = [];
+    for (const [id, d] of Object.entries(decorations)) {
+      const cur = d.hp?.current;
+      if (cur === undefined) continue;
+      const before = prev.current[id];
+      if (before !== undefined && before !== cur)
+        add.push({ id: Date.now() + Math.random(), tokenId: id, delta: cur - before });
+      prev.current[id] = cur;
+    }
+    if (add.length) {
+      setFloaters((f) => [...f, ...add]);
+      const ids = new Set(add.map((a) => a.id));
+      setTimeout(() => setFloaters((f) => f.filter((x) => !ids.has(x.id))), 1500);
+    }
+  }, [decorations]);
+  return floaters;
+}
+
 export function MapCanvas({
   map,
   canMove,
@@ -63,6 +109,8 @@ export function MapCanvas({
   onCellClick,
   selectedTokenId,
   onSelectToken,
+  onUseProp,
+  decorations,
   zoom = 1,
   className,
 }: MapCanvasProps) {
@@ -73,8 +121,11 @@ export function MapCanvas({
     y: number;
     offX: number;
     offY: number;
+    moved: boolean;
   } | null>(null);
   const [painting, setPainting] = useState<Map<string, { x: number; y: number }> | null>(null);
+  const [hover, setHover] = useState<string | null>(null);
+  const floaters = useFloaters(decorations);
 
   const toCell = useCallback((e: { clientX: number; clientY: number }) => {
     const svg = svgRef.current!;
@@ -93,17 +144,22 @@ export function MapCanvas({
   function onTokenDown(e: React.PointerEvent, t: TokenDto) {
     e.stopPropagation();
     onSelectToken?.(t);
-    if (paint || !canMove?.(t)) return;
+    if (paint) return;
+    if (!canMove?.(t)) {
+      // Objeto que não pode ser arrastado: um clique usa (porta, baú, tocha…).
+      if (usable(t)) onUseProp?.(t);
+      return;
+    }
     (e.target as Element).setPointerCapture(e.pointerId);
     const { fx, fy } = toCell(e);
-    setDrag({ token: t, x: t.x, y: t.y, offX: fx - t.x, offY: fy - t.y });
+    setDrag({ token: t, x: t.x, y: t.y, offX: fx - t.x, offY: fy - t.y, moved: false });
   }
 
   function onPointerMove(e: React.PointerEvent) {
     if (drag) {
       const { fx, fy } = toCell(e);
       const p = clampPos(drag.token, fx - drag.offX, fy - drag.offY);
-      if (p.x !== drag.x || p.y !== drag.y) setDrag({ ...drag, ...p });
+      if (p.x !== drag.x || p.y !== drag.y) setDrag({ ...drag, ...p, moved: true });
     } else if (painting) {
       const { fx, fy } = toCell(e);
       const x = Math.floor(fx);
@@ -116,6 +172,7 @@ export function MapCanvas({
   function onPointerUp() {
     if (drag) {
       if (drag.x !== drag.token.x || drag.y !== drag.token.y) onMove?.(drag.token, drag.x, drag.y);
+      else if (!drag.moved && usable(drag.token)) onUseProp?.(drag.token); // clique sem arrastar = usar
       setDrag(null);
     }
     if (painting) {
@@ -135,15 +192,43 @@ export function MapCanvas({
     } else onCellClick?.(x, y);
   }
 
+  /** Teclado: setas movem a peça, Enter/Espaço usa o objeto. */
+  function onTokenKey(e: React.KeyboardEvent, t: TokenDto) {
+    if ((e.key === 'Enter' || e.key === ' ') && usable(t)) {
+      e.preventDefault();
+      onUseProp?.(t);
+      return;
+    }
+    const d = { ArrowUp: [0, -1], ArrowDown: [0, 1], ArrowLeft: [-1, 0], ArrowRight: [1, 0] }[e.key];
+    if (!d || !canMove?.(t)) return;
+    e.preventDefault();
+    const p = clampPos(t, t.x + d[0]!, t.y + d[1]!);
+    if (p.x !== t.x || p.y !== t.y) onMove?.(t, p.x, p.y);
+  }
+
   const terrain = { ...map.terrain };
   if (painting && paint)
     for (const k of painting.keys()) {
       if (paint.terrain) terrain[k] = paint.terrain;
       else delete terrain[k];
     }
+  const cells = Object.entries(terrain)
+    .map(([k, tr]) => {
+      const [x, y] = k.split(',').map(Number) as [number, number];
+      return { k, x, y, tr };
+    })
+    .filter((c) => c.x < map.cols && c.y < map.rows && TERRAIN_STYLE[c.tr]);
+  const isWall = (x: number, y: number) => terrain[`${x},${y}`] === 'wall';
 
   const W = map.cols * CELL;
   const H = map.rows * CELL;
+  const props = map.tokens.filter(isProp);
+  const pieces = map.tokens.filter((t) => !isProp(t));
+  const lights = props.filter((t) => {
+    const l = PROP_LIGHT[t.icon!];
+    return l && t.state === l.when;
+  });
+  const animated = (tr: Terrain) => cells.filter((c) => c.tr === tr);
 
   return (
     <div className={cn('relative overflow-auto rounded-xl border border-line bg-[#0d0b12]', className)}>
@@ -153,6 +238,8 @@ export function MapCanvas({
         viewBox={`0 0 ${W} ${H}`}
         width={W * zoom}
         height={H * zoom}
+        role="img"
+        aria-label={`Mapa ${map.name}: ${map.cols} por ${map.rows} quadrados, ${pieces.length} peças e ${props.length} objetos.`}
         className={cn(
           'block touch-none select-none',
           paint ? 'cursor-crosshair' : onCellClick ? 'cursor-pointer' : '',
@@ -162,56 +249,209 @@ export function MapCanvas({
         onPointerCancel={onPointerUp}
       >
         <defs>
-          <pattern id="p-dots" width="10" height="10" patternUnits="userSpaceOnUse">
-            <circle cx="3" cy="3" r="1" fill="rgba(255,255,255,0.08)" />
+          <pattern id="p-floor" width="40" height="40" patternUnits="userSpaceOnUse">
+            <rect width="40" height="40" fill="#2a2433" />
+            <path d="M0 0H40V40" fill="none" stroke="rgba(0,0,0,0.25)" />
+            <circle cx="12" cy="9" r="0.8" fill="rgba(255,255,255,0.05)" />
+            <circle cx="30" cy="27" r="1" fill="rgba(255,255,255,0.04)" />
           </pattern>
-          <pattern id="p-waves" width="20" height="10" patternUnits="userSpaceOnUse">
-            <path d="M0 6 Q5 2 10 6 T20 6" fill="none" stroke="rgba(255,255,255,0.12)" />
+          <pattern id="p-brick" width="20" height="10" patternUnits="userSpaceOnUse">
+            <rect width="20" height="10" fill="#2a2330" />
+            <path d="M0 0H20M0 5H20M5 0V5M15 5V10" stroke="#120f16" strokeWidth="1" />
+            <rect x="1" y="1" width="3" height="1" fill="rgba(255,255,255,0.05)" />
+          </pattern>
+          <pattern id="p-grass" width="14" height="14" patternUnits="userSpaceOnUse">
+            <rect width="14" height="14" fill="#22432a" />
+            <path
+              d="M3 10 l1 -4 M5 11 l2 -5 M10 6 l1 -3 M11 12 l-1 -4"
+              stroke="#3d7a48"
+              strokeWidth="1"
+              strokeLinecap="round"
+            />
+          </pattern>
+          <pattern id="p-sand" width="12" height="12" patternUnits="userSpaceOnUse">
+            <circle cx="3" cy="3" r="0.8" fill="rgba(255,255,255,0.12)" />
+            <circle cx="9" cy="7" r="0.6" fill="rgba(0,0,0,0.25)" />
+            <circle cx="5" cy="10" r="0.5" fill="rgba(255,255,255,0.08)" />
+          </pattern>
+          <pattern id="p-rock" width="20" height="20" patternUnits="userSpaceOnUse">
+            <path d="M0 8 L6 4 L12 9 L20 5 M4 20 L9 14 L16 17" stroke="rgba(0,0,0,0.4)" fill="none" />
+            <path d="M2 14 L6 11" stroke="rgba(255,255,255,0.08)" />
+          </pattern>
+          <pattern id="p-wood" width="40" height="10" patternUnits="userSpaceOnUse">
+            <rect width="40" height="10" fill="#5a3d22" />
+            <path d="M0 0H40 M26 0V10" stroke="#3a2614" strokeWidth="1" />
+            <path d="M4 5 C10 4 16 6 22 5" stroke="rgba(255,220,170,0.08)" fill="none" />
+          </pattern>
+          <pattern id="p-stone" width="20" height="20" patternUnits="userSpaceOnUse">
+            <rect width="20" height="20" fill="#4a4652" />
+            <path d="M0 0H20M0 10H20M10 0V10M0 10V20" stroke="#2e2b34" strokeWidth="1.2" />
+            <rect x="2" y="2" width="5" height="2" fill="rgba(255,255,255,0.06)" />
+          </pattern>
+          <pattern id="p-carpet" width="20" height="20" patternUnits="userSpaceOnUse">
+            <rect width="20" height="20" fill="#5a1f2e" />
+            <path d="M10 2 L18 10 L10 18 L2 10 Z" fill="none" stroke="#c9a24b" strokeOpacity="0.35" />
+          </pattern>
+          <pattern id="p-road" width="40" height="40" patternUnits="userSpaceOnUse">
+            <rect width="40" height="40" fill="#2b2c30" />
+            <circle cx="8" cy="12" r="0.8" fill="rgba(255,255,255,0.1)" />
+            <circle cx="28" cy="30" r="0.8" fill="rgba(255,255,255,0.08)" />
+          </pattern>
+          <pattern id="p-snow" width="16" height="16" patternUnits="userSpaceOnUse">
+            <rect width="16" height="16" fill="#d9e3ec" />
+            <circle cx="4" cy="4" r="1" fill="#ffffff" />
+            <circle cx="12" cy="11" r="0.8" fill="#b8c7d6" />
+          </pattern>
+          <pattern id="p-tile" width="20" height="20" patternUnits="userSpaceOnUse">
+            <rect width="20" height="20" fill="#c9cfd6" />
+            <path d="M0 0H20V20" fill="none" stroke="#98a1ab" />
+          </pattern>
+          <pattern id="p-waves" width="40" height="16" patternUnits="userSpaceOnUse">
+            <path d="M0 8 Q10 2 20 8 T40 8" fill="none" stroke="rgba(180,220,255,0.28)" strokeWidth="1.5" />
+            <path d="M-10 14 Q0 10 10 14 T30 14" fill="none" stroke="rgba(180,220,255,0.12)" />
+          </pattern>
+          <pattern id="p-lava" width="40" height="20" patternUnits="userSpaceOnUse">
+            <path d="M0 10 Q10 2 20 10 T40 10" fill="none" stroke="rgba(255,200,80,0.55)" strokeWidth="2" />
           </pattern>
           <radialGradient id="g-token" cx="35%" cy="30%" r="75%">
             <stop offset="0" stopColor="rgba(255,255,255,0.35)" />
             <stop offset="1" stopColor="rgba(0,0,0,0.25)" />
           </radialGradient>
+          <radialGradient id="g-vignette" cx="50%" cy="50%" r="75%">
+            <stop offset="0.6" stopColor="rgba(0,0,0,0)" />
+            <stop offset="1" stopColor="rgba(0,0,0,0.45)" />
+          </radialGradient>
+          {lights.map((t) => {
+            const l = PROP_LIGHT[t.icon!]!;
+            return (
+              <radialGradient key={t.id} id={`light-${t.id}`}>
+                <stop offset="0" stopColor={`rgba(${l.color},0.45)`} />
+                <stop offset="0.5" stopColor={`rgba(${l.color},0.15)`} />
+                <stop offset="1" stopColor={`rgba(${l.color},0)`} />
+              </radialGradient>
+            );
+          })}
+          {(['water', 'lava'] as const).map((tr) => (
+            <clipPath key={tr} id={`clip-${tr}`}>
+              {animated(tr).map((c) => (
+                <rect key={c.k} x={c.x * CELL} y={c.y * CELL} width={CELL} height={CELL} />
+              ))}
+            </clipPath>
+          ))}
         </defs>
         <rect width={W} height={H} fill="#16131d" onPointerDown={onBoardDown} />
-        {Object.entries(terrain).map(([k, tr]) => {
-          const [x, y] = k.split(',').map(Number) as [number, number];
-          if (x >= map.cols || y >= map.rows) return null;
-          const s = TERRAIN_STYLE[tr];
-          if (!s) return null;
-          return (
-            <g key={k} pointerEvents="none" data-terrain={tr}>
-              <rect
-                x={x * CELL}
-                y={y * CELL}
-                width={CELL}
-                height={CELL}
-                fill={s.fill}
-                stroke={s.stroke}
-                strokeWidth={s.stroke ? 1.5 : 0}
-              />
-              {s.pattern === 'dots' && (
-                <rect x={x * CELL} y={y * CELL} width={CELL} height={CELL} fill="url(#p-dots)" />
-              )}
-              {s.pattern === 'waves' && (
-                <rect x={x * CELL} y={y * CELL} width={CELL} height={CELL} fill="url(#p-waves)" />
-              )}
-              {s.pattern === 'tree' && (
-                <circle
-                  cx={x * CELL + CELL / 2}
-                  cy={y * CELL + CELL / 2}
-                  r={CELL * 0.34}
-                  fill="#2e5a34"
-                  stroke="#173020"
+
+        {/* Terreno */}
+        <g pointerEvents="none">
+          {cells.map(({ k, x, y, tr }) => {
+            const s = TERRAIN_STYLE[tr];
+            return (
+              <g key={k} data-terrain={tr}>
+                <rect
+                  x={x * CELL}
+                  y={y * CELL}
+                  width={CELL}
+                  height={CELL}
+                  fill={s.pattern ? `url(#${s.pattern})` : s.fill}
                 />
-              )}
-              {s.pattern === 'door' && (
-                <rect x={x * CELL + 6} y={y * CELL + 16} width={CELL - 12} height={8} rx={2} fill="#a07a3a" />
-              )}
+                {s.pattern === 'p-sand' && (
+                  <rect
+                    x={x * CELL}
+                    y={y * CELL}
+                    width={CELL}
+                    height={CELL}
+                    fill={s.fill}
+                    opacity="0.85"
+                    style={{ mixBlendMode: 'multiply' }}
+                  />
+                )}
+                {tr === 'road' && (x + y) % 2 === 0 && (
+                  <rect
+                    x={x * CELL + 16}
+                    y={y * CELL + 18}
+                    width={8}
+                    height={3}
+                    fill="#e6c84a"
+                    opacity="0.6"
+                  />
+                )}
+                {tr === 'door' && (
+                  <g>
+                    <rect
+                      x={x * CELL + 4}
+                      y={y * CELL + 15}
+                      width={CELL - 8}
+                      height={10}
+                      rx={2}
+                      fill="#7a5230"
+                      stroke="#4a3019"
+                    />
+                    <circle cx={x * CELL + CELL - 9} cy={y * CELL + 20} r={1.8} fill="#e6c87f" />
+                  </g>
+                )}
+                {tr === 'tree' && (
+                  <g
+                    className="animate-pulse-soft"
+                    style={{ animationDuration: `${3 + ((x * 7 + y * 3) % 4)}s` }}
+                  >
+                    <circle
+                      cx={x * CELL + CELL / 2 + 3}
+                      cy={y * CELL + CELL / 2 + 4}
+                      r={CELL * 0.42}
+                      fill="rgba(0,0,0,0.35)"
+                    />
+                    <circle
+                      cx={x * CELL + CELL / 2}
+                      cy={y * CELL + CELL / 2}
+                      r={CELL * 0.42}
+                      fill="#2e6b38"
+                      stroke="#173020"
+                    />
+                    <circle
+                      cx={x * CELL + CELL / 2 - 5}
+                      cy={y * CELL + CELL / 2 - 5}
+                      r={CELL * 0.18}
+                      fill="#3f8a4b"
+                    />
+                  </g>
+                )}
+                {tr === 'wall' && (
+                  <>
+                    {/* topo da parede mais claro e sombra no chão abaixo: dá volume */}
+                    <rect x={x * CELL} y={y * CELL} width={CELL} height={4} fill="rgba(255,240,210,0.12)" />
+                    {!isWall(x, y + 1) && y + 1 < map.rows && (
+                      <rect x={x * CELL} y={(y + 1) * CELL} width={CELL} height={6} fill="rgba(0,0,0,0.35)" />
+                    )}
+                  </>
+                )}
+              </g>
+            );
+          })}
+          {/* Água e lava se mexendo */}
+          {animated('water').length > 0 && (
+            <g clipPath="url(#clip-water)">
+              <rect width={W} height={H} fill="#173451" />
+              <rect x={-40} width={W + 80} height={H} fill="url(#p-waves)" className="animate-drift" />
             </g>
-          );
-        })}
-        <g pointerEvents="none" stroke="rgba(201,162,75,0.12)" strokeWidth={1}>
+          )}
+          {animated('lava').length > 0 && (
+            <g clipPath="url(#clip-lava)">
+              <rect width={W} height={H} fill="#7a2a10" />
+              <rect width={W} height={H} fill="#ff5a1a" className="animate-pulse-soft" opacity="0.35" />
+              <rect
+                x={-40}
+                width={W + 80}
+                height={H}
+                fill="url(#p-lava)"
+                className="animate-drift"
+                style={{ animationDuration: '6s' }}
+              />
+            </g>
+          )}
+        </g>
+
+        {/* Grade */}
+        <g pointerEvents="none" stroke="rgba(201,162,75,0.10)" strokeWidth={1}>
           {Array.from({ length: map.cols + 1 }, (_, i) => (
             <line key={`v${i}`} x1={i * CELL} y1={0} x2={i * CELL} y2={H} />
           ))}
@@ -219,7 +459,111 @@ export function MapCanvas({
             <line key={`h${i}`} x1={0} y1={i * CELL} x2={W} y2={i * CELL} />
           ))}
         </g>
-        {drag && (
+
+        {/* Objetos */}
+        {props.map((t) => {
+          const pos = drag?.token.id === t.id ? drag : t;
+          const box = t.size * CELL;
+          const canUse = usable(t) && !!onUseProp;
+          const prop = PROPS[t.icon!];
+          const stateLabel =
+            t.state === 'open'
+              ? 'aberto'
+              : t.state === 'closed'
+                ? 'fechado'
+                : t.state === 'on'
+                  ? 'aceso'
+                  : t.state === 'off'
+                    ? 'apagado'
+                    : '';
+          return (
+            <g
+              key={t.id}
+              data-testid="map-prop"
+              data-icon={t.icon}
+              data-state={t.state ?? ''}
+              data-label={t.label}
+              data-x={pos.x}
+              data-y={pos.y}
+              tabIndex={canUse || canMove?.(t) ? 0 : undefined}
+              role={canUse ? 'button' : undefined}
+              aria-label={`${t.label}${stateLabel ? ` (${stateLabel})` : ''}${canUse ? '. Enter para usar' : ''}`}
+              className={cn(
+                'outline-none transition-transform duration-300 ease-out',
+                canUse && 'cursor-pointer',
+                canMove?.(t) && 'cursor-grab',
+              )}
+              style={{
+                transform: `translate(${pos.x * CELL}px, ${pos.y * CELL}px)`,
+                transition: drag?.token.id === t.id ? 'none' : undefined,
+              }}
+              opacity={t.hidden ? 0.5 : 1}
+              onPointerDown={(e) => onTokenDown(e, t)}
+              onKeyDown={(e) => onTokenKey(e, t)}
+              onPointerEnter={() => setHover(t.id)}
+              onPointerLeave={() => setHover(null)}
+            >
+              <title>
+                {t.label}
+                {stateLabel ? ` — ${stateLabel}` : ''}
+                {canUse ? ' (clique para usar)' : ''}
+              </title>
+              <rect width={box} height={box} fill="transparent" />
+              <g transform={`rotate(${t.rotation} ${box / 2} ${box / 2}) scale(${box / 100})`}>
+                <PropArt kind={t.icon!} state={t.state} />
+              </g>
+              {(hover === t.id || selectedTokenId === t.id) && (
+                <rect
+                  x={1}
+                  y={1}
+                  width={box - 2}
+                  height={box - 2}
+                  rx={6}
+                  fill="none"
+                  stroke={canUse ? '#7dd3fc' : '#e6c87f'}
+                  strokeDasharray="4 3"
+                  strokeOpacity="0.8"
+                />
+              )}
+              {hover === t.id && (
+                <text
+                  x={box / 2}
+                  y={-4}
+                  textAnchor="middle"
+                  fontSize={11}
+                  fill="white"
+                  stroke="black"
+                  strokeWidth={3}
+                  paintOrder="stroke"
+                >
+                  {prop?.label ?? t.label}
+                  {stateLabel ? ` · ${stateLabel}` : ''}
+                </text>
+              )}
+            </g>
+          );
+        })}
+
+        {/* Luz das tochas, fogueiras e postes */}
+        <g pointerEvents="none" style={{ mixBlendMode: 'screen' }}>
+          {lights.map((t) => {
+            const l = PROP_LIGHT[t.icon!]!;
+            const c = (t.size * CELL) / 2;
+            return (
+              <circle
+                key={t.id}
+                cx={t.x * CELL + c}
+                cy={t.y * CELL + c}
+                r={l.radius * CELL}
+                fill={`url(#light-${t.id})`}
+                className={t.icon === 'lamp' ? undefined : 'animate-pulse-soft'}
+                style={{ animationDuration: t.icon === 'torch' || t.icon === 'campfire' ? '1.3s' : '3s' }}
+              />
+            );
+          })}
+        </g>
+
+        {drag && !isProp(drag.token) && (
           <g pointerEvents="none">
             <line
               x1={(drag.token.x + drag.token.size / 2) * CELL}
@@ -242,13 +586,21 @@ export function MapCanvas({
             />
           </g>
         )}
-        {map.tokens.map((t) => {
-          const pos = drag?.token.id === t.id ? drag : t;
+
+        {/* Peças: personagens, NPCs e inimigos */}
+        {pieces.map((t) => {
+          const dragging = drag?.token.id === t.id;
+          const pos = dragging ? drag : t;
           const r = (t.size * CELL) / 2;
-          const cx = pos.x * CELL + r;
-          const cy = pos.y * CELL + r;
           const selected = selectedTokenId === t.id;
           const movable = !paint && !!canMove?.(t);
+          const deco = decorations?.[t.id];
+          const down = deco?.health === 'down' || (deco?.hp ? deco.hp.current <= 0 : false);
+          const hpPct =
+            deco?.hp && deco.hp.max > 0 ? Math.max(0, Math.min(1, deco.hp.current / deco.hp.max)) : null;
+          const ringR = r - 2;
+          const circ = 2 * Math.PI * ringR;
+          const ring = t.kind === 'enemy' ? '#b4232f' : t.kind === 'npc' ? '#c9a24b' : '#7c4ff0';
           return (
             <g
               key={t.id}
@@ -256,44 +608,149 @@ export function MapCanvas({
               data-label={t.label}
               data-x={pos.x}
               data-y={pos.y}
-              className={cn(movable && 'cursor-grab', drag?.token.id === t.id && 'cursor-grabbing')}
+              data-turn={deco?.turn ? 'true' : undefined}
+              tabIndex={movable ? 0 : undefined}
+              role={movable ? 'button' : undefined}
+              aria-label={`${t.label}${deco?.turn ? ', é a vez dele' : ''}${down ? ', caído' : ''}. Coluna ${pos.x + 1}, linha ${pos.y + 1}.${movable ? ' Use as setas para mover.' : ''}`}
+              className={cn('outline-none', movable && 'cursor-grab', dragging && 'cursor-grabbing')}
+              style={{
+                transform: `translate(${pos.x * CELL}px, ${pos.y * CELL}px)`,
+                transition: dragging ? 'none' : 'transform 0.35s cubic-bezier(0.2, 0.8, 0.3, 1)',
+              }}
               opacity={t.hidden ? 0.5 : 1}
               onPointerDown={(e) => onTokenDown(e, t)}
+              onKeyDown={(e) => onTokenKey(e, t)}
+              onPointerEnter={() => setHover(t.id)}
+              onPointerLeave={() => setHover(null)}
             >
               <title>{t.label}</title>
-              <circle
-                cx={cx}
-                cy={cy}
-                r={r - 4}
-                fill={t.color}
-                stroke={selected ? '#e6c87f' : t.kind === 'enemy' ? '#b4232f' : 'rgba(0,0,0,0.6)'}
-                strokeWidth={selected ? 3 : 2}
-                strokeDasharray={t.hidden ? '4 3' : undefined}
-              />
-              <circle cx={cx} cy={cy} r={r - 4} fill="url(#g-token)" pointerEvents="none" />
-              <g transform={`translate(${cx + r - 16}, ${cy - r + 2}) scale(0.5)`} pointerEvents="none">
-                <circle cx="12" cy="12" r="12" fill="#09080d" stroke="rgba(201,162,75,.5)" />
-                <g transform="translate(3 3) scale(0.75)">
-                  <GameIcon name={t.kind} size={24} />
-                </g>
-              </g>
-              <text
-                x={cx}
-                y={cy + 5 * t.size}
-                textAnchor="middle"
-                fontSize={13 * t.size}
-                fontWeight={700}
-                fill="white"
-                pointerEvents="none"
-                style={{ fontFamily: 'var(--font-display)' }}
+              {/* sombra no chão */}
+              <ellipse cx={r} cy={r * 1.72} rx={r * 0.62} ry={r * 0.18} fill="rgba(0,0,0,0.45)" />
+              {deco?.turn && (
+                <circle
+                  cx={r}
+                  cy={r}
+                  r={r - 1}
+                  fill="none"
+                  stroke="#e6c87f"
+                  strokeWidth={3}
+                  className="animate-ring-pulse"
+                  style={{ transformOrigin: 'center', transformBox: 'fill-box' }}
+                />
+              )}
+              <g
+                className={cn(dragging && 'drop-shadow-[0_8px_8px_rgba(0,0,0,0.6)]')}
+                style={{
+                  transform: dragging ? 'scale(1.08)' : undefined,
+                  transformOrigin: 'center',
+                  transformBox: 'fill-box',
+                  transition: 'transform .15s',
+                }}
               >
-                {initials(t.label)}
-              </text>
+                <circle
+                  cx={r}
+                  cy={r}
+                  r={r - 4}
+                  fill={t.color}
+                  stroke={selected ? '#e6c87f' : 'rgba(0,0,0,0.6)'}
+                  strokeWidth={selected ? 3 : 2}
+                  strokeDasharray={t.hidden ? '4 3' : undefined}
+                  filter={down ? 'grayscale(1)' : undefined}
+                  opacity={down ? 0.55 : 1}
+                />
+                <circle cx={r} cy={r} r={r - 4} fill="url(#g-token)" pointerEvents="none" />
+                {/* anel de vida */}
+                <circle cx={r} cy={r} r={ringR} fill="none" stroke="rgba(0,0,0,0.5)" strokeWidth={3} />
+                <circle
+                  cx={r}
+                  cy={r}
+                  r={ringR}
+                  fill="none"
+                  stroke={hpPct === null ? ring : hpPct > 0.5 ? '#22c55e' : hpPct > 0 ? '#f59e0b' : '#b4232f'}
+                  strokeWidth={3}
+                  strokeDasharray={hpPct === null ? undefined : `${circ * hpPct} ${circ}`}
+                  transform={`rotate(-90 ${r} ${r})`}
+                  style={{ transition: 'stroke-dasharray .5s ease' }}
+                />
+                <g transform={`translate(${2 * r - 16}, 2) scale(0.5)`} pointerEvents="none">
+                  <circle cx="12" cy="12" r="12" fill="#09080d" stroke="rgba(201,162,75,.5)" />
+                  <g transform="translate(3 3) scale(0.75)">
+                    <GameIcon name={t.kind} size={24} />
+                  </g>
+                </g>
+                <text
+                  x={r}
+                  y={r + 5 * t.size}
+                  textAnchor="middle"
+                  fontSize={13 * t.size}
+                  fontWeight={700}
+                  fill="white"
+                  pointerEvents="none"
+                  style={{ fontFamily: 'var(--font-display)' }}
+                >
+                  {initials(t.label)}
+                </text>
+                {down && (
+                  <path
+                    d={`M${r - 8} ${r - 8} L${r + 8} ${r + 8} M${r + 8} ${r - 8} L${r - 8} ${r + 8}`}
+                    stroke="#f08a92"
+                    strokeWidth={3}
+                    strokeLinecap="round"
+                  />
+                )}
+                {!!deco?.conditions && (
+                  <g transform={`translate(2, ${2 * r - 14})`}>
+                    <circle cx="6" cy="6" r="6" fill="#4c23a8" stroke="#d6c4ff" />
+                    <text x="6" y="9" textAnchor="middle" fontSize="8" fill="white" fontWeight={700}>
+                      {deco.conditions}
+                    </text>
+                  </g>
+                )}
+              </g>
+              {/* placa de nome */}
+              {(hover === t.id || selected || deco?.turn) && (
+                <text
+                  x={r}
+                  y={2 * r + 11}
+                  textAnchor="middle"
+                  fontSize={11}
+                  fill="white"
+                  stroke="black"
+                  strokeWidth={3}
+                  paintOrder="stroke"
+                  pointerEvents="none"
+                >
+                  {t.label}
+                  {deco?.hp ? ` · ${deco.hp.current}/${deco.hp.max}` : ''}
+                </text>
+              )}
+              {floaters
+                .filter((f) => f.tokenId === t.id)
+                .map((f) => (
+                  <text
+                    key={f.id}
+                    x={r}
+                    y={4}
+                    textAnchor="middle"
+                    fontSize={16}
+                    fontWeight={800}
+                    fill={f.delta < 0 ? '#ff6b6b' : '#4ade80'}
+                    stroke="black"
+                    strokeWidth={3}
+                    paintOrder="stroke"
+                    className="animate-float-up"
+                    style={{ transformBox: 'fill-box' }}
+                    data-testid="hp-floater"
+                  >
+                    {f.delta > 0 ? `+${f.delta}` : f.delta}
+                  </text>
+                ))}
             </g>
           );
         })}
+        <rect width={W} height={H} fill="url(#g-vignette)" pointerEvents="none" />
       </svg>
-      {drag && (
+      {drag && !isProp(drag.token) && (
         <div
           className="pointer-events-none absolute left-3 top-3 rounded-md border border-gold/40 bg-bg/90 px-3 py-1.5 text-xs text-gold-bright"
           data-testid="distance"
