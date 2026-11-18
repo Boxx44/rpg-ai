@@ -336,18 +336,23 @@ export class SystemsService {
 
   async campaignSystemTx(tx: Tx, cid: string): Promise<CampaignSystemDto | null> {
     const [row] = await tx
-      .select({ versionId: v.id, definition: v.definition, systemId: s.id, name: s.name })
+      .select({ versionId: v.id, definition: v.definition, systemId: s.id, name: s.name, templateId: s.templateId })
       .from(schema.campaigns)
       .innerJoin(v, eq(v.id, schema.campaigns.systemVersionId))
       .innerJoin(s, eq(s.id, v.systemId))
       .where(eq(schema.campaigns.id, cid));
     if (!row) return null;
+    // Sistemas criados a partir de um modelo (ainda sem editor próprio) usam a versão
+    // atual do modelo: correções e novas regras do livro chegam às campanhas existentes.
+    const { templateId, ...rest } = row;
+    const tpl = templateId ? SYSTEM_TEMPLATES[templateId] : undefined;
+    if (tpl) rest.definition = tpl;
     const [book] = await tx
       .select({ id: d.id })
       .from(d)
       .where(and(eq(d.systemId, row.systemId), eq(d.status, 'ready'), isNull(d.deletedAt)))
       .limit(1);
-    return { ...row, hasBook: !!book };
+    return { ...rest, hasBook: !!book };
   }
 
   setCampaignSystem(userId: string, cid: string, systemId: string | null, ctx: RequestCtx) {

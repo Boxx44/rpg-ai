@@ -249,6 +249,8 @@ Existem hoje: `apps/web`, `apps/api`, `packages/{db,shared,ui,logger,rules-engin
 
 **Sessões (Preparar x Jogar):** `campaigns/:id/sessions` (listar, `live`, iniciar, `:sid/scene`, `:sid/end`, editar resumo). Ao iniciar, a API avisa cada membro na sala pessoal `u:<usuário>` (`session.started`), que o componente `LiveSessionNotifier` escuta em qualquer página. Na sala da campanha circulam `scene.changed` e `session.ended`. O mapa da cena é definido pelo mestre e os jogadores apenas o seguem.
 
+**Combate:** as rotas ficam em `campaigns/:id/combat`: ver, iniciar, adicionar, editar e remover combatentes, rolar Iniciativa, aplicar PV, passar o turno e encerrar. Cada mudança emite `combat.changed` na sala da campanha, e cada navegador busca o combate de novo. Assim, o filtro do que cada pessoa pode ver (ocultos e PV do mestre) é sempre aplicado no servidor, e não no evento.
+
 **Fluxo de autenticação implementado:** o navegador faz login no Supabase Auth → recebe um token (JWT) → envia o token à API → a API verifica a assinatura (segredo HS256 ou chaves públicas JWKS) → confirma que a conta existe e está ativa → executa a consulta no banco com o papel do usuário (RLS ativo).
 
 ## 8. Dependências externas

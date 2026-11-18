@@ -271,3 +271,40 @@ export const sessions = pgTable('sessions', {
   startedAt: ts('started_at').notNull().defaultNow(),
   endedAt: ts('ended_at'),
 });
+
+export const encounters = pgTable('encounters', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  campaignId: uuid('campaign_id').notNull(),
+  sessionId: uuid('session_id'),
+  status: text('status').$type<'active' | 'ended'>().notNull().default('active'),
+  round: integer('round').notNull().default(1),
+  currentCombatantId: uuid('current_combatant_id'),
+  startedBy: uuid('started_by').notNull(),
+  startedAt: ts('started_at').notNull().defaultNow(),
+  endedAt: ts('ended_at'),
+});
+
+export const combatants = pgTable('combatants', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  encounterId: uuid('encounter_id').notNull(),
+  campaignId: uuid('campaign_id').notNull(),
+  kind: text('kind').$type<'character' | 'npc' | 'enemy'>().notNull(),
+  characterId: uuid('character_id'),
+  npcId: uuid('npc_id'),
+  name: text('name').notNull(),
+  color: text('color').notNull().default('#b4232f'),
+  initiative: integer('initiative'),
+  tiebreak: integer('tiebreak').notNull().default(0), // o banco sorteia (DEFAULT)
+  conditions: text('conditions').array().notNull().default([]),
+  health: text('health').$type<'ok' | 'hurt' | 'down'>().notNull().default('ok'),
+  hidden: boolean('hidden').notNull().default(false),
+  defeated: boolean('defeated').notNull().default(false),
+  createdAt: ts('created_at').notNull().defaultNow(),
+});
+
+export const combatantGmDetails = pgTable('combatant_gm_details', {
+  combatantId: uuid('combatant_id').primaryKey(),
+  campaignId: uuid('campaign_id').notNull(),
+  hpCurrent: integer('hp_current').notNull().default(0),
+  hpMax: integer('hp_max').notNull().default(0),
+});

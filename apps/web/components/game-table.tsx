@@ -5,6 +5,7 @@ import type {
   CampaignSystemDto,
   CharacterDto,
   ChatMessageDto,
+  EncounterDto,
   MapDto,
   MapSummaryDto,
   NpcDto,
@@ -22,6 +23,7 @@ import { useCampaignRealtime } from '@/lib/realtime';
 import { accessToken } from '@/lib/supabase';
 import { ChatPanel } from './chat-panel';
 import { MapCanvas } from './map-canvas';
+import { CombatBanner, CombatPanel } from './combat-panel';
 import { SessionBar } from './session-bar';
 import { QuickSheetPanel, RulesPanel } from './table-panels';
 
@@ -35,6 +37,7 @@ export function GameTable({
   initialCharacters,
   system,
   initialLive,
+  initialCombat,
 }: {
   campaignId: string;
   myId: string;
@@ -45,9 +48,11 @@ export function GameTable({
   initialCharacters: CharacterDto[];
   system: CampaignSystemDto | null;
   initialLive: SessionDto | null;
+  initialCombat: EncounterDto | null;
 }) {
+  const [combat, setCombat] = useState<EncounterDto | null>(initialCombat);
   const [live, setLive] = useState<SessionDto | null>(initialLive);
-  const [tab, setTab] = useState<'chat' | 'sheet' | 'rules'>('chat');
+  const [tab, setTab] = useState<'chat' | 'combat' | 'sheet' | 'rules'>('chat');
   const [characters, setCharacters] = useState(initialCharacters);
   const manager = canManageCampaign(myRole);
   const [messages, setMessages] = useState(initialMessages);
@@ -89,6 +94,13 @@ export function GameTable({
     return list;
   }, [campaignId]);
 
+  const loadCombat = useCallback(async () => {
+    try {
+      setCombat(await api<EncounterDto | null>(`/campaigns/${campaignId}/combat`, await accessToken()));
+    } catch {
+      /* a próxima atualização tenta de novo */
+    }
+  }, [campaignId]);
   const loadNpcs = useCallback(async () => {
     setNpcs(await api<NpcDto[]>(`/campaigns/${campaignId}/npcs`, await accessToken()));
   }, [campaignId]);
@@ -104,7 +116,8 @@ export function GameTable({
     missed.forEach(addMessage);
     await loadMaps();
     await loadMap(mapId);
-  }, [messages, campaignId, addMessage, loadMaps, loadMap, mapId]);
+    await loadCombat();
+  }, [messages, campaignId, addMessage, loadMaps, loadMap, mapId, loadCombat]);
 
   useEffect(() => {
     void loadMap(mapId);
@@ -131,6 +144,7 @@ export function GameTable({
         setMessages([]);
       },
       'session.ended': () => setLive(null),
+      'combat.changed': () => void loadCombat(),
       'scene.changed': (p: { sessionId: string; mapId: string | null }) => {
         setLive((l) => (l && l.id === p.sessionId ? { ...l, activeMapId: p.mapId } : l));
         if (p.mapId) {
@@ -184,6 +198,7 @@ export function GameTable({
             if (id) setMapId(id);
           }}
         />
+        {combat && <CombatBanner campaignId={campaignId} combat={combat} manager={manager} onChange={setCombat} />}
         <div className="flex flex-wrap items-center gap-2">
           {followsScene ? (
             <span className="inline-flex items-center gap-2 text-sm text-ink-muted" data-testid="scene-name">
@@ -271,6 +286,7 @@ export function GameTable({
           {(
             [
               ['chat', 'Crônica'],
+              ['combat', combat ? 'Combate •' : 'Combate'],
               ['sheet', 'Ficha'],
               ['rules', 'Regras'],
             ] as const
@@ -282,7 +298,7 @@ export function GameTable({
               aria-selected={tab === k}
               onClick={() => setTab(k)}
               className={cn(
-                'flex-1 rounded-md px-3 py-1.5 text-sm transition-colors',
+                'flex-1 whitespace-nowrap rounded-md px-2 py-1.5 text-sm transition-colors',
                 tab === k ? 'bg-arcane-700/60 text-ink' : 'text-ink-muted hover:text-ink',
               )}
             >
@@ -303,7 +319,9 @@ export function GameTable({
         </div>
         {tab !== 'chat' && (
           <section className="min-h-[420px] flex-1 overflow-hidden rounded-xl border border-line bg-surface/80">
-            {tab === 'sheet' ? (
+            {tab === 'combat' ? (
+              <CombatPanel campaignId={campaignId} combat={combat} manager={manager} system={system} npcs={npcs} onChange={setCombat} />
+            ) : tab === 'sheet' ? (
               <QuickSheetPanel
                 campaignId={campaignId}
                 system={system}

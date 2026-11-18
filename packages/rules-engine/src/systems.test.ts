@@ -116,3 +116,32 @@ describe('Ordem Paranormal', () => {
     expect(origem.options).toHaveLength(26);
   });
 });
+
+describe('combate em Ordem Paranormal', async () => {
+  const { buildInitiative, emptyValues, validateSystem } = await import('./system');
+  const { ORDEM_PARANORMAL } = await import('./systems/ordem-paranormal');
+  const def = validateSystem(ORDEM_PARANORMAL);
+  it('Iniciativa é teste da perícia Iniciativa (Agilidade + treino)', () => {
+    const v = {
+      ...emptyValues(def),
+      attributes: { ...emptyValues(def).attributes, AGI: 3 },
+      skills: { iniciativa: 'treinado' },
+    };
+    expect(buildInitiative(def, v)).toMatchObject({ expression: '3d20kh1+5', label: 'Iniciativa' });
+  });
+  it('condições do apêndice têm resumo e página', () => {
+    expect(def.conditions.length).toBeGreaterThanOrEqual(30);
+    for (const c of def.conditions) expect(c.page === 320 || c.page === 321).toBe(true);
+    expect(def.conditions.find((c) => c.key === 'morrendo')?.label).toBe('Morrendo');
+  });
+  it('sistema sem configuração de Iniciativa usa 1 dado do sistema', () => {
+    const custom = validateSystem({
+      id: 'x',
+      name: 'X',
+      source: { title: 'Y' },
+      attributes: [],
+      check: { kind: 'die-plus-attribute', die: 20 },
+    });
+    expect(buildInitiative(custom, emptyValues(custom)).expression).toBe('1d20');
+  });
+});

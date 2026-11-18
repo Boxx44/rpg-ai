@@ -60,6 +60,17 @@ Formato: cada decisão tem contexto, escolha e motivo. "Pendente" = precisa da s
 
 **ADR-028 — Preparar x Jogar com sessões ao vivo (migration 0005).** A campanha passa a ter dois espaços: *Preparar* (personagens, NPCs, mapas) e *Jogar* (a mesa). Jogar acontece dentro de uma **sessão** (`sessions`), que só o mestre inicia e encerra, e cada campanha tem no máximo uma ao vivo (índice único parcial). Mensagens e rolagens recebem `session_id` automaticamente por gatilho no banco, para que o cliente não possa forjá-lo. O mestre escolhe o mapa da cena (`set_scene`), que é compartilhado automaticamente, e os jogadores o seguem. O início da sessão é avisado na sala pessoal `u:<id>` de cada membro, de modo que chega mesmo a quem está em outra página. O histórico mostra o resumo escrito pelo mestre e a crônica de cada sessão.
 
+**ADR-029 — Combate (migration 0006).** O combate tem iniciativa, rodadas, turnos, pontos de vida e condições, com um combate ativo por campanha.
+- **Iniciativa:** é rolada no servidor pela regra do sistema. Em Ordem Paranormal é o teste da perícia Iniciativa (p. 93). A rolagem aparece na crônica; a de inimigos fica visível só para o mestre.
+- **Ordem dos turnos:** maior Iniciativa primeiro, com desempate sorteado no banco. A função `advance_turn` só deixa passar a vez o mestre ou o dono do personagem que está na vez, e recusa cliques repetidos.
+- **Inimigos ocultos:** não aparecem para os jogadores por RLS.
+- **PV de NPCs e inimigos:** ficam em `combatant_gm_details`, uma tabela só do mestre. Os jogadores veem apenas o estado (Ileso, Machucado, Caído).
+- **PV dos personagens:** ficam na ficha. Dano e cura no combate alteram a ficha, então não existe uma segunda cópia de PV que possa divergir.
+- **Condições:** vêm da lista do sistema (Ordem: apêndice, p. 320–321), escritas com palavras próprias e com a página do livro. O servidor recusa condições que não existem no sistema.
+- **Inimigo com 0 PV:** sai da ordem de turnos automaticamente, e o mestre pode desfazer.
+
+**ADR-030 — Campanhas usam a versão atual do modelo de sistema.** Sistemas criados a partir de um modelo (ex.: Ordem Paranormal) ainda não têm editor próprio. Por isso, a campanha lê a definição atual do modelo, e não a cópia guardada na criação. Assim, novas regras extraídas do livro (como condições e Iniciativa) chegam às campanhas que já existem. Quando houver editor de sistema, uma versão editada passará a ser usada no lugar do modelo.
+
 ## Decisões pendentes (preciso da sua escolha)
 
 ### D-01 — Provedor principal de IA (LLM)

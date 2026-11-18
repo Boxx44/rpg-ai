@@ -9,6 +9,20 @@
 
 ---
 
+## 17/11/2026 — Combate na mesa
+
+**O que funciona (testado):**
+- **Cadastro:** a confirmação de e-mail foi desligada no Supabase, a pedido do responsável. Amigos criam conta e já entram.
+- **Iniciar combate:** a mesa tem uma aba **Combate**. O mestre clica em "Iniciar combate" e todos os personagens entram. O mestre adiciona inimigos (vários de uma vez: "Zumbi 1, 2…") ou NPCs, com PV, e pode deixá-los **ocultos**.
+- **Iniciativa:** cada jogador rola a do próprio personagem. A rolagem é feita no servidor pela regra do livro (Ordem: perícia Iniciativa, p. 93) e aparece na crônica. O mestre pode digitar a Iniciativa dos inimigos.
+- **Turnos:** uma faixa sobre o mapa mostra "Rodada N · Vez de X". O mestre passa os turnos. O jogador vê "(sua vez!)" e um botão "Encerrar meu turno". Quando a lista acaba, começa a próxima rodada.
+- **Dano e cura:** nos personagens, alteram a ficha. Nos inimigos, os PV ficam só para o mestre; os jogadores veem apenas Ileso, Machucado ou Caído. Inimigo com 0 PV sai da ordem de turnos.
+- **Condições:** em Ordem Paranormal são as 36 condições do livro (p. 320–321), cada uma com um resumo ao passar o mouse.
+
+**Testes:** rules-engine 47, shared 8, banco 43, API 66 e ponta a ponta 32, todos passando, além de lint e typecheck sem erros.
+
+**Ainda não feito:** rituais com botão de conjurar e gasto de PE; habilidades de classe e trilhas por NEX; armas com botão de ataque e dano; bestiário de criaturas do livro.
+
 ## 17/11/2026 — Preparar x Jogar (sessões ao vivo)
 
 **O que funciona (testado):**

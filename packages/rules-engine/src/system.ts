@@ -100,6 +100,15 @@ export const systemDefinitionSchema = z.object({
     )
     .max(20)
     .default([]),
+  /** Condições do sistema (resumo com palavras próprias + página). */
+  conditions: z
+    .array(z.object({ key, label: z.string().max(40), summary: z.string().max(300), page }))
+    .max(60)
+    .default([]),
+  /** Como a Iniciativa é rolada: teste de uma perícia do sistema (ou atributo). */
+  initiative: z
+    .object({ skill: key.optional(), attribute: key.optional(), page })
+    .optional(),
   /** Resumo das regras centrais, escrito com palavras próprias, com página de referência. */
   reference: z
     .array(z.object({ title: z.string().max(80), text: z.string().max(600), page }))
@@ -123,6 +132,8 @@ export function validateSystem(input: unknown): SystemDefinition {
     if (!attrKeys.has(s.attribute))
       throw new FormulaError(`Perícia ${s.key}: atributo ${s.attribute} inexistente`);
   for (const f of [...def.resources.map((r) => r.max), ...def.derived.map((d) => d.formula)]) parseFormula(f);
+  if (def.initiative?.skill && !def.skills.some((s) => s.key === def.initiative!.skill))
+    throw new FormulaError(`Iniciativa: perícia ${def.initiative.skill} inexistente`);
   // Executa todas as fórmulas com uma ficha padrão para pegar erros cedo.
   computeSheet(def, emptyValues(def));
   return def;
@@ -247,4 +258,17 @@ export function buildCheck(
   }
   const expression = normalizeDice(bonus ? `${dice}${bonus > 0 ? '+' : ''}${bonus}` : dice);
   return { expression, label, notes };
+}
+
+/** Teste de Iniciativa pela regra do sistema (perícia/atributo configurados). */
+export function buildInitiative(def: SystemDefinition, v: SystemValues): { expression: string; label: string } {
+  const ini = def.initiative;
+  if (ini?.skill) return buildCheck(def, v, { skill: ini.skill });
+  if (ini?.attribute) return buildCheck(def, v, { attribute: ini.attribute });
+  return { expression: `1d${def.check.die}`, label: 'Iniciativa' };
+}
+
+/** Recurso usado como "vida" no combate (o primeiro recurso do sistema, ex.: PV). */
+export function healthResource(def: SystemDefinition): string | undefined {
+  return def.resources[0]?.key;
 }

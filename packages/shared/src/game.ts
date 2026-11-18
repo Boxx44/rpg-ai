@@ -306,6 +306,7 @@ export const WS_EVENTS = {
   sessionStarted: 'session.started',
   sessionEnded: 'session.ended',
   sceneChanged: 'scene.changed',
+  combatChanged: 'combat.changed',
 } as const;
 
 // ───────────── Sessões ─────────────
@@ -333,4 +334,80 @@ export interface SessionStartedEvent {
   campaignId: string;
   campaignName: string;
   session: SessionDto;
+}
+
+// ───────────── Combate ─────────────
+export const startCombatSchema = z.object({
+  /** Já coloca todos os personagens da campanha no combate. */
+  includeCharacters: z.boolean().default(true),
+});
+
+export const addCombatantSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('character'), characterId: z.string().uuid() }),
+  z.object({
+    kind: z.literal('npc'),
+    npcId: z.string().uuid(),
+    hp: z.number().int().min(0).max(99999).default(0),
+    hidden: z.boolean().default(false),
+  }),
+  z.object({
+    kind: z.literal('enemy'),
+    name: z.string().trim().min(1).max(80),
+    hp: z.number().int().min(0).max(99999).default(0),
+    color: z.string().regex(/^#[0-9a-fA-F]{6}$/).default('#b4232f'),
+    hidden: z.boolean().default(false),
+    /** Quantos iguais criar (ex.: 3 zumbis → "Zumbi 1", "Zumbi 2"...). */
+    count: z.number().int().min(1).max(12).default(1),
+  }),
+]);
+export type AddCombatantInput = z.infer<typeof addCombatantSchema>;
+
+export const updateCombatantSchema = z
+  .object({
+    name: z.string().trim().min(1).max(80),
+    initiative: z.number().int().min(-999).max(999).nullable(),
+    conditions: z.array(z.string().trim().min(1).max(40)).max(30),
+    hidden: z.boolean(),
+    defeated: z.boolean(),
+    hpMax: z.number().int().min(0).max(99999),
+  })
+  .partial();
+
+export const rollInitiativeSchema = z.object({
+  /** Bônus para quem não tem ficha de sistema (inimigos, ficha livre). */
+  bonus: z.number().int().min(-50).max(50).default(0),
+});
+export const hpChangeSchema = z.object({
+  /** Negativo = dano, positivo = cura. */
+  delta: z.number().int().min(-99999).max(99999),
+});
+export const nextTurnSchema = z.object({ expected: z.string().uuid().nullable() });
+
+export type CombatHealth = 'ok' | 'hurt' | 'down';
+
+export interface CombatantDto {
+  id: string;
+  kind: 'character' | 'npc' | 'enemy';
+  name: string;
+  color: string;
+  characterId: string | null;
+  npcId: string | null;
+  initiative: number | null;
+  conditions: string[];
+  health: CombatHealth;
+  hidden: boolean;
+  defeated: boolean;
+  /** PV visíveis: personagens para todos; NPCs/inimigos só para o mestre. */
+  hp: { current: number; max: number } | null;
+  /** O usuário pode rolar Iniciativa / passar o turno por este combatente. */
+  mine: boolean;
+}
+
+export interface EncounterDto {
+  id: string;
+  round: number;
+  /** null para jogadores quando é a vez de um combatente oculto. */
+  currentId: string | null;
+  hiddenTurn: boolean;
+  combatants: CombatantDto[];
 }

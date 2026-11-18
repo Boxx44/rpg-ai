@@ -166,6 +166,14 @@ O restante (regras extraídas, sessões, combate, memória, IA) entra nas fases 
 - Funções (SECURITY DEFINER, só mestre/co-mestre): `start_session` (erro 23505 se já houver uma ao vivo), `set_scene` (também marca o mapa como compartilhado), `end_session`.
 - RLS: membros leem; mestres podem editar só `title` e `summary`.
 
+## Combate (migration `0006_combat.sql`)
+
+- `encounters`: combate da campanha (no máximo um `active`, por índice único parcial), com rodada, combatente da vez (`current_combatant_id`) e ligação com a sessão ao vivo.
+- `combatants`: personagens (ligados à ficha), NPCs e inimigos, com Iniciativa, desempate sorteado (`tiebreak`), condições (`text[]`), estado público de saúde (`ok`/`hurt`/`down`), `hidden` e `defeated`.
+- `combatant_gm_details`: PV de NPCs e inimigos, visíveis só para o mestre.
+- Funções: `combat_order` (ordem dos turnos), `set_initiative` (mestre ou dono do personagem) e `advance_turn` (mestre ou dono do personagem da vez; recusa clique repetido com erro 40001).
+- RLS: membros leem o combate; ocultos só para o mestre; escrita direta só do mestre.
+
 ## Backups
 
 Supabase Pro: backups diários (ponto no tempo opcional, pago à parte). Além disso: dump lógico semanal para armazenamento externo e teste de restauração trimestral (Fase 9).
