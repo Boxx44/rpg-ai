@@ -183,6 +183,9 @@ export const mapTokens = pgTable('map_tokens', {
   y: integer('y').notNull(),
   size: integer('size').notNull().default(1),
   hidden: boolean('hidden').notNull().default(false),
+  icon: text('icon'),
+  state: text('state').$type<'open' | 'closed' | 'on' | 'off'>(),
+  rotation: integer('rotation').notNull().default(0),
   createdAt: ts('created_at').notNull().defaultNow(),
   updatedAt: ts('updated_at').notNull().defaultNow(),
 });

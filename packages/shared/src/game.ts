@@ -210,19 +210,85 @@ export interface NpcDto {
 }
 
 // ───────────── Mapas ─────────────
-export const TERRAINS = ['floor', 'wall', 'door', 'water', 'grass', 'sand', 'rock', 'lava', 'tree'] as const;
-export type Terrain = (typeof TERRAINS)[number];
-export const TERRAIN_LABELS: Record<Terrain, string> = {
+export const TERRAINS = [
+  'floor',
+  'wall',
+  'door',
+  'water',
+  'grass',
+  'sand',
+  'rock',
+  'lava',
+  'tree',
+  'wood',
+  'stone',
+  'carpet',
+  'road',
+  'dirt',
+  'snow',
+  'tile',
+] as const;
+export const TERRAIN_LABELS: Record<(typeof TERRAINS)[number], string> = {
   floor: 'Piso',
   wall: 'Parede',
-  door: 'Porta',
+  door: 'Porta (fixa)',
   water: 'Água',
   grass: 'Grama',
   sand: 'Areia',
-  rock: 'Pedra',
+  rock: 'Rocha',
   lava: 'Lava',
   tree: 'Árvore',
+  wood: 'Assoalho',
+  stone: 'Pedra',
+  carpet: 'Tapete',
+  road: 'Asfalto',
+  dirt: 'Terra',
+  snow: 'Neve',
+  tile: 'Azulejo',
 };
+
+/**
+ * Objetos do mapa (peças "object" com desenho). `states` = estados possíveis
+ * (o primeiro é o inicial); objetos com estados podem ser usados pelos jogadores.
+ */
+export const PROPS = {
+  door: { label: 'Porta', group: 'Construção', size: 1, states: ['closed', 'open'] },
+  gate: { label: 'Portão', group: 'Construção', size: 2, states: ['closed', 'open'] },
+  window: { label: 'Janela', group: 'Construção', size: 1, states: ['closed', 'open'] },
+  house: { label: 'Casa', group: 'Construção', size: 3, states: [] },
+  stairs: { label: 'Escada', group: 'Construção', size: 1, states: [] },
+  table: { label: 'Mesa', group: 'Móveis', size: 2, states: [] },
+  chair: { label: 'Cadeira', group: 'Móveis', size: 1, states: [] },
+  bed: { label: 'Cama', group: 'Móveis', size: 2, states: [] },
+  sofa: { label: 'Sofá', group: 'Móveis', size: 2, states: [] },
+  bookshelf: { label: 'Estante', group: 'Móveis', size: 1, states: [] },
+  computer: { label: 'Computador', group: 'Móveis', size: 1, states: ['off', 'on'] },
+  chest: { label: 'Baú', group: 'Itens', size: 1, states: ['closed', 'open'] },
+  crate: { label: 'Caixa', group: 'Itens', size: 1, states: [] },
+  barrel: { label: 'Barril', group: 'Itens', size: 1, states: [] },
+  knife: { label: 'Faca', group: 'Armas', size: 1, states: [] },
+  pistol: { label: 'Pistola', group: 'Armas', size: 1, states: [] },
+  shotgun: { label: 'Espingarda', group: 'Armas', size: 1, states: [] },
+  axe: { label: 'Machado', group: 'Armas', size: 1, states: [] },
+  torch: { label: 'Tocha', group: 'Luz e clima', size: 1, states: ['on', 'off'] },
+  campfire: { label: 'Fogueira', group: 'Luz e clima', size: 1, states: ['on', 'off'] },
+  lamp: { label: 'Poste de luz', group: 'Luz e clima', size: 1, states: ['on', 'off'] },
+  ritual: { label: 'Círculo ritual', group: 'Paranormal', size: 2, states: ['on', 'off'] },
+  blood: { label: 'Mancha de sangue', group: 'Paranormal', size: 1, states: [] },
+  grave: { label: 'Lápide', group: 'Paranormal', size: 1, states: [] },
+  body: { label: 'Corpo', group: 'Paranormal', size: 1, states: [] },
+  trap: { label: 'Armadilha', group: 'Paranormal', size: 1, states: ['on', 'off'] },
+  car: { label: 'Carro', group: 'Exterior', size: 2, states: [] },
+  bush: { label: 'Arbusto', group: 'Exterior', size: 1, states: [] },
+  boulder: { label: 'Pedra grande', group: 'Exterior', size: 1, states: [] },
+} as const satisfies Record<
+  string,
+  { label: string; group: string; size: number; states: readonly ('open' | 'closed' | 'on' | 'off')[] }
+>;
+export type PropKind = keyof typeof PROPS;
+export const PROP_KINDS = Object.keys(PROPS) as PropKind[];
+export const PROP_STATE_LABELS = { open: 'aberta', closed: 'fechada', on: 'aceso', off: 'apagado' } as const;
+export type Terrain = (typeof TERRAINS)[number];
 
 export const createMapSchema = z.object({
   name: name(80),
@@ -276,6 +342,9 @@ export const createTokenSchema = z.object({
   hidden: z.boolean().default(false),
   characterId: z.string().uuid().optional(),
   npcId: z.string().uuid().optional(),
+  /** Objeto do mapa: qual desenho (porta, baú, tocha…). */
+  icon: z.enum(PROP_KINDS as [PropKind, ...PropKind[]]).optional(),
+  rotation: z.union([z.literal(0), z.literal(90), z.literal(180), z.literal(270)]).optional(),
 });
 export type CreateTokenInput = z.infer<typeof createTokenSchema>;
 
@@ -285,6 +354,7 @@ export const updateTokenSchema = z
     color: color.optional(),
     size: z.number().int().min(1).max(4).optional(),
     hidden: z.boolean().optional(),
+    rotation: z.union([z.literal(0), z.literal(90), z.literal(180), z.literal(270)]).optional(),
   })
   .refine((v) => Object.keys(v).length > 0, { message: 'Nenhum campo para atualizar' });
 export type UpdateTokenInput = z.infer<typeof updateTokenSchema>;
@@ -307,6 +377,9 @@ export interface TokenDto {
   y: number;
   size: number;
   hidden: boolean;
+  icon: PropKind | null;
+  state: 'open' | 'closed' | 'on' | 'off' | null;
+  rotation: number;
 }
 
 export interface MapSummaryDto {
@@ -334,6 +407,7 @@ export function gridDistance(a: { x: number; y: number }, b: { x: number; y: num
 export const WS_EVENTS = {
   chatMessage: 'chat.message',
   tokenMoved: 'token.moved',
+  propToggled: 'prop.toggled',
   mapsChanged: 'maps.changed',
   npcsChanged: 'npcs.changed',
   charactersChanged: 'characters.changed',

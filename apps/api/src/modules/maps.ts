@@ -17,6 +17,8 @@ import {
   type CreateTokenInput,
   createTokenSchema,
   ERROR_CODES,
+  PROPS,
+  type PropKind,
   type MapDto,
   type MapSummaryDto,
   moveTokenSchema,
@@ -57,6 +59,9 @@ function toToken(r: typeof t.$inferSelect): TokenDto {
     y: r.y,
     size: r.size,
     hidden: r.hidden,
+    icon: (r.icon as PropKind | null) ?? null,
+    state: r.state ?? null,
+    rotation: r.rotation,
   };
 }
 
@@ -236,9 +241,19 @@ export class MapsService {
           .where(and(eq(schema.npcs.id, input.npcId), eq(schema.npcs.campaignId, cid)));
         if (!npc) throw notFound('NPC');
       }
+      // Objeto do mapa: começa no primeiro estado do catálogo (porta fechada, tocha acesa…).
+      const prop = input.icon ? PROPS[input.icon] : undefined;
+      if (prop && input.kind !== 'object')
+        throw new AppError(ERROR_CODES.VALIDATION, 'Desenhos de objeto só valem para objetos', 400);
       const [row] = await tx
         .insert(t)
-        .values({ mapId, campaignId: cid, controlledBy, ...input })
+        .values({
+          mapId,
+          campaignId: cid,
+          controlledBy,
+          ...input,
+          state: (prop?.states[0] as 'open' | 'closed' | 'on' | 'off' | undefined) ?? null,
+        })
         .returning();
       return toToken(row!);
     });
@@ -274,6 +289,34 @@ export class MapsService {
       return map.shared;
     });
     this.notify(cid, mapId, shared);
+  }
+
+  /** Usar um objeto: abrir/fechar porta ou baú, acender/apagar tocha. */
+  async toggleProp(userId: string, cid: string, mapId: string, tokenId: string) {
+    const { state, shared, hidden, label } = await withUser(this.db, userId, async (tx) => {
+      await requireMember(tx, cid);
+      const map = await this.mapOf(tx, cid, mapId);
+      let state: string | undefined;
+      try {
+        const r = await tx.execute<{ s: string }>(sql`select app_private.toggle_prop(${tokenId}::uuid) as s`);
+        state = r[0]?.s;
+      } catch (e) {
+        const code = (e as { code?: string }).code ?? (e as { cause?: { code?: string } }).cause?.code;
+        if (code === '42501') throw forbidden('Você não pode usar este objeto');
+        if (code === 'P0002') throw notFound('Objeto');
+        throw e;
+      }
+      const [row] = await tx
+        .select()
+        .from(t)
+        .where(and(eq(t.id, tokenId), eq(t.mapId, mapId)));
+      if (!row) throw notFound('Objeto');
+      return { state, shared: map.shared, hidden: row.hidden, label: row.label };
+    });
+    const payload = { mapId, tokenId, state, label, by: userId };
+    if (shared && !hidden) this.rt.campaign(cid, WS_EVENTS.propToggled, payload);
+    else this.rt.managers(cid, WS_EVENTS.propToggled, payload);
+    return { state };
   }
 
   async moveToken(
@@ -318,6 +361,17 @@ export class MapsService {
 @Controller('campaigns/:id/maps')
 export class MapsController {
   constructor(private readonly svc: MapsService) {}
+
+  @Post(':mapId/tokens/:tokenId/toggle')
+  @HttpCode(200)
+  toggle(
+    @CurrentUser() u: AuthUser,
+    @Param('id') id: string,
+    @Param('mapId') mid: string,
+    @Param('tokenId') tid: string,
+  ) {
+    return this.svc.toggleProp(u.id, campaignId(id), anyId(mid), anyId(tid));
+  }
 
   @Get()
   list(@CurrentUser() u: AuthUser, @Param('id') id: string) {
