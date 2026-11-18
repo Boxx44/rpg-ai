@@ -120,6 +120,7 @@ export const characterSheetSchema = z.object({
       otherSpaces: z.number().int().optional(),
       rituals: z.array(z.string().max(40)).max(100).optional(),
       powers: z.array(z.string().max(90)).max(60).optional(),
+      perm: z.record(z.number().int()).optional(),
     })
     .optional(),
 });
@@ -168,6 +169,8 @@ export const npcDetailsSchema = z.object({
     .array(z.object({ label: name(40), value: text(40) }))
     .max(40)
     .default([]),
+  /** Ficha completa do NPC (mesmo formato da ficha de personagem). */
+  sheet: characterSheetSchema.default({}),
 });
 export type NpcDetails = z.infer<typeof npcDetailsSchema>;
 
@@ -443,13 +446,23 @@ export interface CombatantDto {
   hp: { current: number; max: number } | null;
   /** O usuário pode rolar Iniciativa / passar o turno por este combatente. */
   mine: boolean;
+  /** Armas e rituais da ficha do NPC (só para o mestre), para agir no combate. */
+  npcSheet?: { weapons: { name: string; damage: string }[]; rituals: { key: string; name: string }[] } | null;
   /** Ficha do livro (só para o mestre). */
   creature?: {
     key: string;
     defesa: number | null;
     vd: number | null;
     page?: number;
-    attacks: { name: string; times: number; test: string; damage: string; type: string }[];
+    attacks: {
+      name: string;
+      times: number;
+      test: string;
+      damage: string;
+      type: string;
+      critRange: number;
+      critMult: number;
+    }[];
   } | null;
 }
 
@@ -480,4 +493,53 @@ export interface ActionResultDto {
   notes: string[];
   critical?: boolean;
   character?: CharacterDto;
+}
+export const restSchema = z.object({
+  sleep: z.boolean().default(false),
+  relax: z.boolean().default(false),
+  quality: z.string().max(40),
+  meal: z.string().max(40).optional(),
+  relaxPartners: z.number().int().min(0).max(20).default(0),
+});
+
+// ───────────── Biblioteca de fichas ─────────────
+export const librarySheetSchema = z.object({
+  kind: z.enum(['character', 'npc']),
+  name: z.string().trim().min(1).max(80),
+  concept: z.string().max(200).default(''),
+  color: z
+    .string()
+    .regex(/^#[0-9a-fA-F]{6}$/)
+    .default('#8b5cf6'),
+  systemTemplate: z
+    .string()
+    .regex(/^[a-z0-9_]{1,40}$/)
+    .nullable()
+    .default(null),
+  sheet: characterSheetSchema.default({}),
+  npc: z
+    .object({
+      appearance: z.string().max(2000).default(''),
+      publicDescription: z.string().max(2000).default(''),
+      details: npcDetailsSchema.omit({ sheet: true }).default({}),
+    })
+    .default({}),
+});
+export const updateLibrarySheetSchema = librarySheetSchema.omit({ kind: true }).partial();
+export const useLibrarySheetSchema = z.object({ campaignId: z.string().uuid() });
+export const saveToLibrarySchema = z.object({
+  characterId: z.string().uuid().optional(),
+  npcId: z.string().uuid().optional(),
+});
+
+export interface LibrarySheetDto {
+  id: string;
+  kind: 'character' | 'npc';
+  name: string;
+  concept: string;
+  color: string;
+  systemTemplate: string | null;
+  sheet: CharacterSheet;
+  npc: { appearance: string; publicDescription: string; details: Omit<NpcDetails, 'sheet'> };
+  updatedAt: string;
 }

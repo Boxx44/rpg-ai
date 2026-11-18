@@ -10,6 +10,7 @@ import type { SystemDefinition } from '../system';
 import {
   OP_CLASSES,
   OP_CREATURES,
+  OP_MUNDANE,
   OP_POWERS,
   OP_PROTECTIONS,
   OP_RITUALS,
@@ -34,7 +35,7 @@ export const ORDEM_PARANORMAL: SystemDefinition = {
   edition: 'v1.3',
   source: {
     title: 'Ordem Paranormal RPG (livro de regras, v1.3)',
-    note: 'Modelo montado e revisado a partir do livro. Habilidades de classe, trilhas, rituais e itens ainda não estão automatizados: consulte o livro pela busca de regras.',
+    note: 'Modelo montado e revisado a partir do livro: ficha, armas, rituais, condições, combate, interlúdio e ameaças. O efeito detalhado de cada habilidade continua no livro (links com a página).',
   },
   attributes: [
     { key: 'AGI', label: 'Agilidade', abbr: 'AGI', min: 0, max: 5, default: 1, page: 25 },
@@ -563,9 +564,79 @@ export const ORDEM_PARANORMAL: SystemDefinition = {
     fearElement: 'medo',
     page: 129,
   },
+  // Interlúdio (p. 102–103): dormir recupera PV e PE = limite de PE × condição; relaxar faz o mesmo com SAN.
+  rest: {
+    amount: LEVEL,
+    sleep: ['pv', 'pe'],
+    relax: ['san'],
+    relaxBonusPerParticipant: 1,
+    qualities: [
+      { key: 'precaria', label: 'Precária (carro, barraca)', mult: 0.5 },
+      { key: 'normal', label: 'Normal (quarto simples)', mult: 1 },
+      { key: 'confortavel', label: 'Confortável (hotel bom)', mult: 2 },
+      { key: 'luxuosa', label: 'Luxuosa (hotel de luxo)', mult: 3 },
+    ],
+    meals: [
+      { key: 'favorito', label: 'Prato favorito', summary: 'Relaxar recupera +2 SAN.', relaxBonus: 2 },
+      {
+        key: 'nutritivo',
+        label: 'Prato nutritivo',
+        summary: 'Dormir: recuperação de PV aumenta um nível.',
+        sleepMultFor: 'pv',
+      },
+      {
+        key: 'energetico',
+        label: 'Prato energético',
+        summary: 'Dormir: recuperação de PE aumenta um nível.',
+        sleepMultFor: 'pe',
+      },
+      { key: 'rapido', label: 'Prato rápido', summary: 'Revisar caso neste interlúdio: +5 no teste.' },
+    ],
+    page: 102,
+  },
+  // Criação (p. 24): atributos começam em 1, 4 pontos, um pode cair para 0 (+1 ponto), máximo 3.
+  // Perícias e proficiências por classe (p. 35, 39, 43); ocultista começa com 3 rituais de 1º círculo (p. 42).
+  creation: {
+    attributes: { base: 1, points: 4, max: 3, dumpOne: true, page: 24 },
+    classes: {
+      combatente: {
+        choose: [
+          ['luta', 'pontaria'],
+          ['fortitude', 'reflexos'],
+        ],
+        fixed: [],
+        free: '1 + attr("INT")',
+        weapons: ['simples', 'tatica'],
+        protections: ['leve'],
+        rituals: 0,
+        ritualCircle: 1,
+        page: 35,
+      },
+      especialista: {
+        choose: [],
+        fixed: [],
+        free: '7 + attr("INT")',
+        weapons: ['simples'],
+        protections: ['leve'],
+        rituals: 0,
+        ritualCircle: 1,
+        page: 39,
+      },
+      ocultista: {
+        choose: [],
+        fixed: ['ocultismo', 'vontade'],
+        free: '3 + attr("INT")',
+        weapons: ['simples'],
+        protections: [],
+        rituals: 3,
+        ritualCircle: 1,
+        page: 43,
+      },
+    },
+  },
   classes: OP_CLASSES,
   powers: OP_POWERS,
-  creatures: OP_CREATURES,
+  creatures: [...OP_CREATURES, ...OP_MUNDANE],
   reference: [
     {
       title: 'Testes',

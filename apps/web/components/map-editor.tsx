@@ -368,7 +368,7 @@ export function MapEditor({
                   <Input
                     name="name"
                     defaultValue={map.name}
-                    aria-label="Nome do mapa"
+                    aria-label="Renomear mapa"
                     className="col-span-2 h-9"
                     key={`n${map.id}${map.name}`}
                   />

@@ -179,6 +179,12 @@ O restante (regras extraídas, sessões, combate, memória, IA) entra nas fases 
 - `combatants.creature_key`: qual ficha do bestiário do sistema originou o combatente (PV, Iniciativa e ataques vêm da definição do sistema).
 - A ficha do personagem (`characters.sheet.system`) ganhou armas, proteções, espaços de outros itens, rituais aprendidos e poderes. O servidor valida tudo contra o sistema da campanha, e não houve mudança de tabela para isso.
 
+## Biblioteca, NPC com ficha e mesa de treino (migration `0008_library_npc_sheets_sandbox.sql`)
+
+- `library_sheets`: fichas pessoais (personagem ou NPC) de cada usuário, com modelo de sistema, ficha e dados de NPC. O RLS permite acesso só ao dono.
+- `npc_gm_details.sheet`: ficha completa do NPC (só o mestre lê e grava).
+- `campaigns.sandbox` + índice único por criador: no máximo uma mesa de treino por pessoa. A marcação é feita pela função `app_private.mark_sandbox`.
+
 ## Backups
 
 Supabase Pro: backups diários (ponto no tempo opcional, pago à parte). Além disso: dump lógico semanal para armazenamento externo e teste de restauração trimestral (Fase 9).

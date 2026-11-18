@@ -10,19 +10,7 @@ import {
   Patch,
   Post,
 } from '@nestjs/common';
-import {
-  buildAttack,
-  buildCheck,
-  computeSheet,
-  FormulaError,
-  keptD20,
-  planRitual,
-  type RitualForm,
-  sanitizeValues,
-  type SystemDefinition,
-  type SystemValues,
-  validateSystem,
-} from '@rpg-ai/rules-engine';
+import { buildCheck, FormulaError, sanitizeValues, validateSystem } from '@rpg-ai/rules-engine';
 import { and, asc, type Database, eq, isNull, schema, sql, type Tx, withUser } from '@rpg-ai/db';
 import {
   type ActionResultDto,
@@ -30,6 +18,7 @@ import {
   canManageCampaign,
   castSchema,
   characterCheckSchema,
+  restSchema,
   type CharacterDto,
   type CharacterSheet,
   characterSheetSchema,
@@ -48,6 +37,7 @@ import { requireMember, requirePlayer } from './access';
 import { audit } from './audit';
 import { anyId, campaignId } from './ids';
 import { ChatService } from './chat';
+import { type ActorLoader, SheetActions, withCurrent } from './sheet-actions';
 import { SystemsService } from './documents/systems';
 import { Realtime } from './realtime.gateway';
 
@@ -60,6 +50,7 @@ export class CharactersService {
     private readonly rt: Realtime,
     private readonly systems: SystemsService,
     private readonly chat: ChatService,
+    private readonly actions: SheetActions,
   ) {}
 
   /** Valida a parte da ficha que pertence ao sistema da campanha (atributos, perícias, NEX…). */
@@ -133,136 +124,62 @@ export class CharactersService {
     return { cur, def, values: sanitizeValues(def, cur.sheet.system) };
   }
 
-  private rules<T>(fn: () => T): T {
-    try {
-      return fn();
-    } catch (e) {
-      if (e instanceof FormulaError) throw new AppError(ERROR_CODES.VALIDATION, e.message, 400);
-      throw e;
-    }
-  }
-
-  /** Grava recursos atuais (PE, SAN…) sem mexer no resto da ficha. */
-  private async setCurrent(
-    tx: Tx,
-    id: string,
-    cur: CharacterDto,
-    values: SystemValues,
-    changes: Record<string, number>,
-  ) {
-    const system = { ...cur.sheet.system!, current: { ...values.current, ...changes } };
-    await tx
-      .update(ch)
-      .set({ sheet: { ...cur.sheet, system }, version: sql`${ch.version} + 1` })
-      .where(eq(ch.id, id));
-  }
-
-  /** Ataque com arma da ficha: teste pela perícia do sistema e dano (crítico multiplica os dados). */
-  async attack(
-    userId: string,
-    cid: string,
-    id: string,
-    input: z.infer<typeof attackSchema>,
-  ): Promise<ActionResultDto> {
-    const { plan, name } = await withUser(this.db, userId, async (tx) => {
+  private loader(userId: string, cid: string, id: string): ActorLoader {
+    return async (tx) => {
       const { cur, def, values } = await this.actionContext(tx, userId, cid, id);
       return {
         name: cur.name,
-        plan: this.rules(() => buildAttack(def, values, input.weapon, input)),
+        def,
+        values,
+        save: async (t, current, permAdd) => {
+          const system = withCurrent(cur.sheet.system ?? {}, values, current, permAdd);
+          await t
+            .update(ch)
+            .set({ sheet: { ...cur.sheet, system }, version: sql`${ch.version} + 1` })
+            .where(eq(ch.id, id));
+        },
       };
-    });
-    const atk = await this.chat.roll(userId, cid, {
-      expression: plan.attack.expression,
-      label: `${name}: ${plan.attack.label}`.slice(0, 80),
-      visibility: input.visibility,
-    });
-    const natural = atk.roll
-      ? keptD20({ expression: atk.roll.expression, total: atk.roll.total, parts: atk.roll.parts as never })
-      : null;
-    const critical = natural !== null && natural >= plan.critRange;
-    const dmg = await this.chat.roll(userId, cid, {
-      expression: critical ? plan.damage.critExpression : plan.damage.expression,
-      label:
-        `${name}: dano${critical ? ` CRÍTICO x${plan.critMult}` : ''}${plan.damage.type ? ` (${plan.damage.type})` : ''}`.slice(
-          0,
-          80,
-        ),
-      visibility: input.visibility,
-    });
-    return {
-      messages: [atk, dmg],
-      critical,
-      notes: [...plan.notes, 'Acerta se o teste for maior ou igual à Defesa do alvo.'],
     };
   }
 
-  /** Conjurar ritual: gasta PE, rola o custo paranormal (ou perde SAN no Medo) e o efeito básico. */
-  async cast(
+  private async afterChange(
     userId: string,
     cid: string,
     id: string,
-    input: z.infer<typeof castSchema>,
+    r: ActionResultDto,
   ): Promise<ActionResultDto> {
-    const prep = await withUser(this.db, userId, async (tx) => {
-      const { cur, def, values } = await this.actionContext(tx, userId, cid, id);
-      const plan = this.rules(() => planRitual(def, values, input.ritual, input.form as RitualForm));
-      const changes: Record<string, number> = { [plan.spend.key]: plan.spend.after };
-      const san = def.ritualRules?.sanity;
-      if (plan.sanityLoss && san) changes[san] = this.resource(def, values, san) - plan.sanityLoss;
-      await this.setCurrent(tx, id, cur, values, changes);
-      return { plan, name: cur.name, san };
-    });
-    const { plan, name, san } = prep;
-    const formName =
-      input.form === 'basic' ? '' : ` (${input.form === 'discente' ? 'discente' : 'verdadeiro'})`;
-    const messages = [
-      await this.chat.post(userId, cid, {
-        content: `✶ ${name} conjura ${plan.name}${formName}: −${plan.cost} PE · DT ${plan.dt}${plan.sanityLoss ? ` · −${plan.sanityLoss} SAN` : ''}`,
-        visibility: input.visibility,
-      }),
-    ];
-    const notes = [...plan.notes];
-    if (plan.permanentNote) notes.push(plan.permanentNote);
-    if (plan.sanityCheck) {
-      const chk = await this.chat.roll(userId, cid, {
-        expression: plan.sanityCheck.expression,
-        label: `${name}: custo paranormal (DT ${plan.sanityCheck.dc})`.slice(0, 80),
-        visibility: input.visibility,
-      });
-      messages.push(chk);
-      const total = chk.roll?.total ?? 0;
-      if (total < plan.sanityCheck.dc && san) {
-        await withUser(this.db, userId, async (tx) => {
-          const { cur, def, values } = await this.actionContext(tx, userId, cid, id);
-          await this.setCurrent(tx, id, cur, values, {
-            [san]: this.resource(def, values, san) - plan.sanityCheck!.loss,
-          });
-        });
-        notes.push(`Falhou no custo paranormal: perdeu ${plan.sanityCheck.loss} de Sanidade.`);
-        if (plan.sanityCheck.dc - total >= 5)
-          notes.push('Falhou por 5 ou mais: perde também 1 de Sanidade permanentemente (p. 131).');
-      }
-    }
-    if (plan.effect)
-      messages.push(
-        await this.chat.roll(userId, cid, {
-          expression: plan.effect.expression,
-          label: plan.effect.label.slice(0, 80),
-          visibility: input.visibility,
-        }),
-      );
     this.rt.campaign(cid, WS_EVENTS.charactersChanged, { campaignId: cid });
     const character = await withUser(
       this.db,
       userId,
       async (tx) => (await this.fetch(tx, userId, cid, id))[0],
     );
-    return { messages, notes, character };
+    return { ...r, character };
   }
 
-  private resource(def: SystemDefinition, values: SystemValues, key: string): number {
-    const sheet = computeSheet(def, values);
-    return sheet.resources.find((r) => r.key === key)?.current ?? 0;
+  /** Ataque com arma da ficha: teste pela perícia do sistema e dano (crítico multiplica os dados). */
+  attack(userId: string, cid: string, id: string, input: z.infer<typeof attackSchema>) {
+    return this.actions.attack(userId, cid, this.loader(userId, cid, id), input);
+  }
+
+  /** Conjurar ritual: gasta PE, custo paranormal (ou SAN direto no Medo) e efeito básico. */
+  async cast(userId: string, cid: string, id: string, input: z.infer<typeof castSchema>) {
+    return this.afterChange(
+      userId,
+      cid,
+      id,
+      await this.actions.cast(userId, cid, this.loader(userId, cid, id), input),
+    );
+  }
+
+  /** Interlúdio: dormir/relaxar recuperando PV, PE e SAN pela regra. */
+  async rest(userId: string, cid: string, id: string, input: z.infer<typeof restSchema>) {
+    return this.afterChange(
+      userId,
+      cid,
+      id,
+      await this.actions.rest(userId, cid, this.loader(userId, cid, id), input),
+    );
   }
 
   private async fetch(tx: Tx, userId: string, cid: string, id?: string): Promise<CharacterDto[]> {
@@ -319,7 +236,13 @@ export class CharactersService {
       if (!cur) throw notFound('Personagem');
       if (!cur.canEdit) throw forbidden('Só o dono do personagem ou o mestre podem editar');
       const { version, ...changes } = input;
-      if (changes.sheet) changes.sheet = await this.withSystem(tx, cid, changes.sheet);
+      if (changes.sheet) {
+        // Perda permanente (ex.: Sanidade) só muda pelas regras ou pelo mestre.
+        const role = await requireMember(tx, cid);
+        if (!canManageCampaign(role) && changes.sheet.system)
+          changes.sheet.system = { ...changes.sheet.system, perm: cur.sheet.system?.perm ?? {} };
+        changes.sheet = await this.withSystem(tx, cid, changes.sheet);
+      }
       const r = await tx
         .update(ch)
         .set({ ...changes, version: sql`${ch.version} + 1` })
@@ -391,6 +314,10 @@ export class CharactersController {
   @Post(':cid/cast')
   cast(@CurrentUser() u: AuthUser, @Param('id') id: string, @Param('cid') c: string, @Body() b: unknown) {
     return this.svc.cast(u.id, campaignId(id), anyId(c), parse(castSchema, b));
+  }
+  @Post(':cid/rest')
+  rest(@CurrentUser() u: AuthUser, @Param('id') id: string, @Param('cid') c: string, @Body() b: unknown) {
+    return this.svc.rest(u.id, campaignId(id), anyId(c), parse(restSchema, b));
   }
   @Post(':cid/check')
   check(@CurrentUser() u: AuthUser, @Param('id') id: string, @Param('cid') c: string, @Body() b: unknown) {

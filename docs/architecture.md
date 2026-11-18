@@ -253,6 +253,13 @@ Existem hoje: `apps/web`, `apps/api`, `packages/{db,shared,ui,logger,rules-engin
 
 **Ações de personagem:** `POST characters/:id/attack` e `POST characters/:id/cast`. O motor de regras (`buildAttack`, `planRitual`) monta as rolagens a partir da ficha e da definição do sistema. O servidor rola, grava na crônica e desconta recursos. Criaturas: `POST combat/combatants/:id/attack`, só para o mestre.
 
+**Ações de ficha compartilhadas:** `SheetActions` (api/modules/sheet-actions.ts) atende personagens (`characters/:id/attack|cast|rest`) e NPCs (`npcs/:id/attack|cast|rest`, só o mestre). Cada um fornece um "carregador" que traz a ficha validada e sabe gravar recursos e perdas permanentes.
+
+**Biblioteca e treino:**
+- Biblioteca: `GET/POST/PATCH/DELETE /library`, `POST /library/:id/use` (copiar para a campanha) e `POST /campaigns/:id/library` (guardar cópia).
+- Treino: `POST /sandbox` (abre ou cria) e `DELETE /sandbox` (recomeçar).
+- No site: páginas `/library` (biblioteca e criação guiada) e `/practice`, e o botão "Ver como jogador" na mesa.
+
 **Fluxo de autenticação implementado:** o navegador faz login no Supabase Auth → recebe um token (JWT) → envia o token à API → a API verifica a assinatura (segredo HS256 ou chaves públicas JWKS) → confirma que a conta existe e está ativa → executa a consulta no banco com o papel do usuário (RLS ativo).
 
 ## 8. Dependências externas

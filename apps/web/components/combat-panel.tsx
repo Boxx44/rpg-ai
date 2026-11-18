@@ -116,6 +116,23 @@ function CombatantRow({
 }) {
   const [atkBusy, setAtkBusy] = useState<number | null>(null);
   const [atkNote, setAtkNote] = useState<string>();
+  async function npcAction(kind: 'attack' | 'cast', body: object, i: number) {
+    setAtkBusy(i);
+    setAtkNote(undefined);
+    try {
+      const r = await api<{ critical?: boolean; notes: string[] }>(
+        `/campaigns/${campaignId}/npcs/${c.npcId}/${kind}`,
+        await accessToken(),
+        { method: 'POST', body: json(body) },
+      );
+      setAtkNote([r.critical ? 'Crítico!' : '', ...r.notes].filter(Boolean).join(' ') || undefined);
+    } catch (e) {
+      setAtkNote(e instanceof Error ? e.message : 'Erro');
+    } finally {
+      setAtkBusy(null);
+    }
+  }
+
   async function creatureAttack(i: number) {
     setAtkBusy(i);
     setAtkNote(undefined);
@@ -182,6 +199,42 @@ function CombatantRow({
           </Button>
         )}
       </div>
+      {manager && c.npcSheet && c.npcId && (
+        <div
+          className="space-y-1 rounded-md border border-line/70 bg-surface/60 px-2 py-1.5 text-xs"
+          data-testid="npc-actions"
+        >
+          <div className="flex flex-wrap gap-1">
+            {c.npcSheet.weapons.map((w, i) => (
+              <Button
+                key={`${w.name}-${i}`}
+                size="sm"
+                variant="secondary"
+                disabled={atkBusy !== null}
+                loading={atkBusy === i}
+                onClick={() => npcAction('attack', { weapon: i }, i)}
+                aria-label={`${c.name} ataca com ${w.name}`}
+              >
+                <Swords /> {w.name} · {w.damage}
+              </Button>
+            ))}
+            {c.npcSheet.rituals.map((r, i) => (
+              <Button
+                key={r.key}
+                size="sm"
+                variant="secondary"
+                disabled={atkBusy !== null}
+                loading={atkBusy === 100 + i}
+                onClick={() => npcAction('cast', { ritual: r.key }, 100 + i)}
+                aria-label={`${c.name} conjura ${r.name}`}
+              >
+                ✶ {r.name}
+              </Button>
+            ))}
+          </div>
+          {atkNote && <p className="text-gold-bright">{atkNote}</p>}
+        </div>
+      )}
       {manager && c.creature && (
         <div
           className="space-y-1 rounded-md border border-line/70 bg-surface/60 px-2 py-1.5 text-xs"
@@ -412,10 +465,13 @@ function AddCombatant({
             required
           >
             <option value="">Escolha a criatura</option>
-            {['sangue', 'morte', 'conhecimento', 'energia', 'medo'].map((el) => {
+            {(['sangue', 'morte', 'conhecimento', 'energia', 'medo', null] as const).map((el) => {
               const list = creatures.filter((c) => c.element === el);
               return list.length ? (
-                <optgroup key={el} label={el[0]!.toUpperCase() + el.slice(1)}>
+                <optgroup
+                  key={el ?? 'realidade'}
+                  label={el ? el[0]!.toUpperCase() + el.slice(1) : 'Ameaças da realidade'}
+                >
                   {list.map((c) => (
                     <option key={c.key} value={c.key}>
                       {c.name} — VD {c.vd ?? '?'}, {c.pv} PV

@@ -81,6 +81,8 @@ export interface RitualPlan {
   sanityCheck?: { expression: string; dc: number; loss: number };
   /** Perda automática de Sanidade (rituais de Medo). */
   sanityLoss?: number;
+  /** Perda permanente de Sanidade (rituais de Medo: 1, 2 ou 3 conforme a forma). */
+  permanentLoss?: number;
   permanentNote?: string;
   /** Dado do efeito na forma básica (dano ou cura), quando o livro dá um. */
   effect?: { expression: string; label: string };
@@ -126,7 +128,8 @@ export function planRitual(
   const fear = rules.fearElement && r.elements.includes(rules.fearElement);
   if (fear) {
     plan.sanityLoss = cost;
-    plan.permanentNote = `Ritual de Medo: além disso, perde ${form === 'basic' ? 1 : form === 'discente' ? 2 : 3} de Sanidade permanentemente.`;
+    plan.permanentLoss = form === 'basic' ? 1 : form === 'discente' ? 2 : 3;
+    plan.permanentNote = `Ritual de Medo: perdeu também ${plan.permanentLoss} de Sanidade máxima, para sempre.`;
   } else if (rules.sanityCheckSkill) {
     const c = buildCheck(def, v, { skill: rules.sanityCheckSkill });
     plan.sanityCheck = { expression: c.expression, dc: 20 + cost, loss: cost };
@@ -143,4 +146,52 @@ export function planRitual(
   if (form !== 'basic')
     plan.notes.push('Formas avançadas têm requisitos de círculo/afinidade: confira no livro.');
   return plan;
+}
+
+export interface RestRequest {
+  sleep: boolean;
+  relax: boolean;
+  quality: string;
+  meal?: string;
+  /** Outros personagens que também relaxam neste interlúdio. */
+  relaxPartners?: number;
+}
+export interface RestPlan {
+  changes: Record<string, number>;
+  gains: { key: string; label: string; amount: number }[];
+  notes: string[];
+}
+
+/** Interlúdio: até duas ações; dormir e relaxar uma vez cada (p. 102–103). */
+export function planRest(def: SystemDefinition, v: SystemValues, req: RestRequest): RestPlan {
+  const rest = def.rest;
+  if (!rest) throw new FormulaError('Este sistema não tem regras de interlúdio');
+  if (!req.sleep && !req.relax) throw new FormulaError('Escolha dormir e/ou relaxar');
+  const q = rest.qualities.find((x) => x.key === req.quality);
+  if (!q) throw new FormulaError('Condição de descanso inválida');
+  const meal = req.meal ? rest.meals.find((m) => m.key === req.meal) : undefined;
+  if (req.meal && !meal) throw new FormulaError('Refeição inválida');
+  const base = evalFormula(rest.amount, { attr: (k) => v.attributes[k] ?? 0, field: (k) => v.fields[k] });
+  const sheet = computeSheet(def, v);
+  const changes: Record<string, number> = {};
+  const gains: RestPlan['gains'] = [];
+  const recover = (key: string, amount: number) => {
+    const r = sheet.resources.find((x) => x.key === key);
+    if (!r) return;
+    const after = Math.min(r.max, r.current + amount);
+    changes[key] = after;
+    gains.push({ key, label: r.label, amount: after - r.current });
+  };
+  if (req.sleep)
+    for (const k of rest.sleep) {
+      const mult = q.mult + (meal?.sleepMultFor === k ? 1 : 0);
+      recover(k, Math.floor(base * mult));
+    }
+  if (req.relax) {
+    const extra = (req.relaxPartners ?? 0) * rest.relaxBonusPerParticipant + (meal?.relaxBonus ?? 0);
+    for (const k of rest.relax) recover(k, Math.floor(base * q.mult) + extra);
+  }
+  const notes = [`Interlúdio: ${q.label}${meal ? ` · ${meal.label}` : ''}.`];
+  if (meal && !meal.sleepMultFor && !meal.relaxBonus) notes.push(meal.summary);
+  return { changes, gains, notes };
 }

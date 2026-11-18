@@ -34,6 +34,7 @@ export function normalizeValues(def: SystemDefinition, v: RawValues | undefined)
     otherSpaces: v?.otherSpaces ?? 0,
     rituals: [...(v?.rituals ?? [])],
     powers: [...(v?.powers ?? [])],
+    perm: { ...(v?.perm ?? {}) },
   };
 }
 
@@ -215,6 +216,11 @@ export function SystemSheet({
                     <span className="text-sm text-ink-faint">/{r.max}</span>
                   </span>
                 </div>
+                {r.lost ? (
+                  <p className="text-[11px] text-sky-300" data-testid={`lost-${r.key}`}>
+                    −{r.lost} máximo perdido para sempre
+                  </p>
+                ) : null}
                 <div className="h-1.5 overflow-hidden rounded-full bg-bg">
                   <div
                     className={cn(

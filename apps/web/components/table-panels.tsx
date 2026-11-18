@@ -278,7 +278,7 @@ export function QuickSheetPanel({
     }
   }
 
-  async function action(path: 'attack' | 'cast', body: object, key: string) {
+  async function action(path: 'attack' | 'cast' | 'rest', body: object, key: string) {
     setBusy(key);
     setError(undefined);
     try {
@@ -477,6 +477,7 @@ export function QuickSheetPanel({
           onCast={(key, form) => action('cast', { ritual: key, form }, `cast-${key}-${form}`)}
         />
       )}
+      {def.rest && <RestForm def={def} busy={busy} onRest={(body) => action('rest', body, 'rest')} />}
       {notes.map((n) => (
         <Alert key={n} tone="warning">
           {n}
@@ -485,5 +486,104 @@ export function QuickSheetPanel({
       {error && <Alert tone="error">{error}</Alert>}
       <p className="text-xs text-ink-faint">O resultado de cada teste aparece na crônica para todos.</p>
     </div>
+  );
+}
+
+/** Interlúdio: até duas ações; dormir recupera PV e PE, relaxar recupera SAN. */
+function RestForm({
+  def,
+  busy,
+  onRest,
+}: {
+  def: SystemDefinition;
+  busy: string | null;
+  onRest: (body: object) => void;
+}) {
+  const rest = def.rest!;
+  const [open, setOpen] = useState(false);
+  const [sleep, setSleep] = useState(true);
+  const [relax, setRelax] = useState(false);
+  const [quality, setQuality] = useState(
+    rest.qualities.find((q) => q.mult === 1)?.key ?? rest.qualities[0]!.key,
+  );
+  const [meal, setMeal] = useState('');
+  const [partners, setPartners] = useState(0);
+  if (!open)
+    return (
+      <Button variant="secondary" size="sm" onClick={() => setOpen(true)}>
+        ☾ Interlúdio (descansar)
+      </Button>
+    );
+  return (
+    <section className="space-y-2 rounded-lg border border-line p-3 text-sm" data-testid="rest-form">
+      <p className="text-xs font-semibold uppercase tracking-[0.15em] text-gold/80">
+        Interlúdio (p. {rest.page})
+      </p>
+      <div className="flex flex-wrap gap-3">
+        <label className="flex items-center gap-1.5">
+          <input type="checkbox" checked={sleep} onChange={(e) => setSleep(e.target.checked)} /> Dormir (PV e
+          PE)
+        </label>
+        <label className="flex items-center gap-1.5">
+          <input type="checkbox" checked={relax} onChange={(e) => setRelax(e.target.checked)} /> Relaxar (SAN)
+        </label>
+      </div>
+      <div className="flex flex-wrap gap-2">
+        <Select
+          aria-label="Condição de descanso"
+          value={quality}
+          onChange={(e) => setQuality(e.target.value)}
+          className="h-9 w-56"
+        >
+          {rest.qualities.map((q) => (
+            <option key={q.key} value={q.key}>
+              {q.label}
+            </option>
+          ))}
+        </Select>
+        <Select
+          aria-label="Refeição"
+          value={meal}
+          onChange={(e) => setMeal(e.target.value)}
+          className="h-9 w-44"
+        >
+          <option value="">Sem refeição especial</option>
+          {rest.meals.map((m) => (
+            <option key={m.key} value={m.key} title={m.summary}>
+              {m.label}
+            </option>
+          ))}
+        </Select>
+        {relax && (
+          <label className="flex items-center gap-1.5 text-ink-muted">
+            Relaxam junto
+            <Input
+              type="number"
+              min={0}
+              max={20}
+              aria-label="Outros personagens relaxando"
+              value={partners}
+              onChange={(e) => setPartners(Math.max(0, Math.min(20, Number(e.target.value) || 0)))}
+              className="h-9 w-16"
+            />
+          </label>
+        )}
+      </div>
+      <div className="flex gap-2">
+        <Button
+          size="sm"
+          loading={busy === 'rest'}
+          disabled={!!busy || (!sleep && !relax)}
+          onClick={() =>
+            onRest({ sleep, relax, quality, ...(meal ? { meal } : {}), relaxPartners: relax ? partners : 0 })
+          }
+        >
+          Descansar
+        </Button>
+        <Button size="sm" variant="ghost" onClick={() => setOpen(false)}>
+          Fechar
+        </Button>
+      </div>
+    </section>
   );
 }

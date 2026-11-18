@@ -358,7 +358,7 @@ export class SystemsService {
       .from(d)
       .where(and(eq(d.systemId, row.systemId), eq(d.status, 'ready'), isNull(d.deletedAt)))
       .limit(1);
-    return { ...rest, hasBook: !!book, bookId: book?.id ?? null };
+    return { ...rest, hasBook: !!book, bookId: book?.id ?? null, templateId: templateId ?? null };
   }
 
   setCampaignSystem(userId: string, cid: string, systemId: string | null, ctx: RequestCtx) {

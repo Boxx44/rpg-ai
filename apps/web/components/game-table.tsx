@@ -15,7 +15,7 @@ import type {
 } from '@rpg-ai/shared';
 import { canManageCampaign } from '@rpg-ai/shared';
 import { Alert, Badge, Button, cn, Select } from '@rpg-ai/ui';
-import { Map as MapIcon, Minus, Plus, Wifi, WifiOff } from 'lucide-react';
+import { Eye, Map as MapIcon, Minus, Plus, Wifi, WifiOff } from 'lucide-react';
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import { api, json } from '@/lib/api';
@@ -59,7 +59,14 @@ export function GameTable({
     setPageReq({ page, nonce: Date.now() });
   }, []);
   const [characters, setCharacters] = useState(initialCharacters);
-  const manager = canManageCampaign(myRole);
+  const realManager = canManageCampaign(myRole);
+  /**
+   * "Ver como jogador": pré-visualização só para o mestre conferir o que os jogadores
+   * enxergam. É um filtro na tela do próprio mestre (que já tem esses dados); o sigilo
+   * real continua no servidor.
+   */
+  const [asPlayer, setAsPlayer] = useState(false);
+  const manager = realManager && !asPlayer;
   const [messages, setMessages] = useState(initialMessages);
   const [maps, setMaps] = useState(initialMaps);
   const [npcs, setNpcs] = useState(initialNpcs);
@@ -184,10 +191,66 @@ export function GameTable({
     }
   }
 
-  const visibleMaps = maps;
+  const visibleMaps = asPlayer ? maps.filter((m) => m.shared) : maps;
+  const shownMap = asPlayer
+    ? map && maps.find((m) => m.id === map.id)?.shared
+      ? { ...map, tokens: map.tokens.filter((t) => !t.hidden) }
+      : null
+    : map;
+  const myChars = new Set(characters.filter((c) => c.ownerId === myId).map((c) => c.id));
+  const shownCombat: EncounterDto | null =
+    asPlayer && combat
+      ? (() => {
+          const list = combat.combatants
+            .filter((c) => !c.hidden)
+            .map((c) => ({
+              ...c,
+              hp: c.kind === 'character' ? c.hp : null,
+              creature: null,
+              npcSheet: null,
+              mine: !!c.characterId && myChars.has(c.characterId),
+            }));
+          const visible = list.some((c) => c.id === combat.currentId);
+          return {
+            ...combat,
+            combatants: list,
+            currentId: visible ? combat.currentId : null,
+            hiddenTurn: !!combat.currentId && !visible,
+          };
+        })()
+      : combat;
+  const shownMessages = (live ? messages.filter((m) => m.sessionId === live.id) : messages).filter(
+    (m) => !asPlayer || m.visibility !== 'gm',
+  );
+  const shownNpcs = asPlayer ? npcs.filter((n) => n.revealed).map(({ details: _d, ...n }) => n) : npcs;
+  const shownCharacters = asPlayer ? characters.filter((c) => c.ownerId === myId) : characters;
   return (
     <div className="grid gap-5 xl:grid-cols-[1fr_400px]">
       <section className="min-w-0 space-y-3" aria-label="Mapa">
+        {realManager && (
+          <div
+            className={cn(
+              'flex flex-wrap items-center gap-3 rounded-xl border px-4 py-2 text-sm',
+              asPlayer ? 'border-sky-400/50 bg-sky-500/10' : 'border-line/60 bg-surface/50',
+            )}
+            data-testid="preview-bar"
+          >
+            <Eye className="size-4 text-sky-300" />
+            <span className="flex-1 text-ink-muted">
+              {asPlayer
+                ? 'Pré-visualização: você está vendo a mesa como um jogador (sem segredos, ocultos e mapas não compartilhados).'
+                : 'Confira o que os jogadores veem antes de revelar algo.'}
+            </span>
+            <Button
+              size="sm"
+              variant={asPlayer ? 'primary' : 'secondary'}
+              onClick={() => setAsPlayer((v) => !v)}
+              aria-pressed={asPlayer}
+            >
+              {asPlayer ? 'Voltar a ver como mestre' : 'Ver como jogador'}
+            </Button>
+          </div>
+        )}
         <SessionBar
           campaignId={campaignId}
           manager={manager}
@@ -203,8 +266,8 @@ export function GameTable({
             if (id) setMapId(id);
           }}
         />
-        {combat && (
-          <CombatBanner campaignId={campaignId} combat={combat} manager={manager} onChange={setCombat} />
+        {shownCombat && (
+          <CombatBanner campaignId={campaignId} combat={shownCombat} manager={manager} onChange={setCombat} />
         )}
         <div className="flex flex-wrap items-center gap-2">
           {followsScene ? (
@@ -259,8 +322,8 @@ export function GameTable({
             </Button>
           </div>
         </div>
-        {map ? (
-          <MapCanvas map={map} zoom={zoom} canMove={canMove} onMove={onMove} className="max-h-[70vh]" />
+        {shownMap ? (
+          <MapCanvas map={shownMap} zoom={zoom} canMove={canMove} onMove={onMove} className="max-h-[70vh]" />
         ) : (
           <div className="flex min-h-[360px] flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-line p-8 text-center">
             <p className="font-display text-lg">Nenhum mapa na mesa</p>
@@ -316,11 +379,11 @@ export function GameTable({
         <div className={cn('min-h-0 flex-1', tab !== 'chat' && 'hidden')}>
           <ChatPanel
             campaignId={campaignId}
-            messages={live ? messages.filter((m) => m.sessionId === live.id) : messages}
+            messages={shownMessages}
             myId={myId}
             canPlay={myRole !== 'spectator'}
             isManager={manager}
-            npcs={npcs}
+            npcs={shownNpcs}
             onSent={addMessage}
           />
         </div>
@@ -329,10 +392,10 @@ export function GameTable({
             {tab === 'combat' ? (
               <CombatPanel
                 campaignId={campaignId}
-                combat={combat}
+                combat={shownCombat}
                 manager={manager}
                 system={system}
-                npcs={npcs}
+                npcs={shownNpcs}
                 onChange={setCombat}
                 onOpenPage={openBookPage}
               />
@@ -340,7 +403,7 @@ export function GameTable({
               <QuickSheetPanel
                 campaignId={campaignId}
                 system={system}
-                characters={characters}
+                characters={shownCharacters}
                 myId={myId}
                 manager={manager}
                 onUpdated={(c) => setCharacters((list) => list.map((x) => (x.id === c.id ? c : x)))}

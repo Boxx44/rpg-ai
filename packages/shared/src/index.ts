@@ -83,6 +83,8 @@ export interface MeDto {
 }
 
 export interface CampaignDto {
+  /** Mesa de treino: campanha particular para testar tudo. */
+  sandbox: boolean;
   id: string;
   organizationId: string;
   name: string;

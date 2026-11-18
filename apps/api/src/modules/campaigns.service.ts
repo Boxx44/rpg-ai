@@ -42,6 +42,7 @@ export class CampaignsService {
         description: c.description,
         gmMode: c.gmMode,
         status: c.status,
+        sandbox: c.sandbox,
         myRole: m.role,
         memberCount: sql<number>`(select count(*)::int from campaign_members x where x.campaign_id = ${c.id})`,
         liveSessionId: schema.sessions.id,

@@ -250,6 +250,8 @@ export const systemDefinitionSchema = z.object({
               test: z.string().max(40),
               damage: z.string().max(40),
               type: z.string().max(30),
+              critRange: z.number().int().min(2).max(20).optional(),
+              critMult: z.number().int().min(2).max(10).optional(),
             }),
           )
           .max(10),
@@ -258,6 +260,61 @@ export const systemDefinitionSchema = z.object({
     )
     .max(300)
     .default([]),
+  /** Regras de criação de personagem (usadas pela criação guiada). */
+  creation: z
+    .object({
+      attributes: z.object({
+        base: z.number().int(),
+        points: z.number().int().min(0).max(30),
+        max: z.number().int(),
+        /** Pode baixar um atributo para 0 e ganhar 1 ponto. */
+        dumpOne: z.boolean().default(false),
+        page,
+      }),
+      classes: z.record(
+        z.object({
+          /** Escolha uma perícia de cada par. */
+          choose: z.array(z.array(key).min(2).max(4)).max(5).default([]),
+          fixed: z.array(key).max(10).default([]),
+          /** Quantidade de perícias livres (fórmula). */
+          free: z.string().max(100),
+          weapons: z.array(z.string().max(20)).max(5).default([]),
+          protections: z.array(key).max(5).default([]),
+          rituals: z.number().int().min(0).max(10).default(0),
+          ritualCircle: z.number().int().min(1).max(4).default(1),
+          page,
+        }),
+      ),
+    })
+    .optional(),
+  /** Interlúdio: descanso entre cenas (dormir recupera PV/PE, relaxar recupera SAN). */
+  rest: z
+    .object({
+      /** Fórmula base da recuperação (ex.: limite de PE). */
+      amount: z.string().max(200),
+      sleep: z.array(key).max(5),
+      relax: z.array(key).max(5),
+      /** Bônus de relaxar por participante além de você. */
+      relaxBonusPerParticipant: z.number().int().min(0).max(10).default(0),
+      qualities: z
+        .array(z.object({ key, label: z.string().max(40), mult: z.number().min(0).max(10) }))
+        .max(10),
+      meals: z
+        .array(
+          z.object({
+            key,
+            label: z.string().max(40),
+            summary: z.string().max(200),
+            /** Efeito mecânico: +1 multiplicador em um recurso ao dormir, ou bônus fixo ao relaxar. */
+            sleepMultFor: key.optional(),
+            relaxBonus: z.number().int().optional(),
+          }),
+        )
+        .max(10)
+        .default([]),
+      page,
+    })
+    .optional(),
   /** Resumo das regras centrais, escrito com palavras próprias, com página de referência. */
   reference: z
     .array(z.object({ title: z.string().max(80), text: z.string().max(600), page }))
@@ -297,6 +354,8 @@ export interface SystemValues {
   otherSpaces: number;
   rituals: string[];
   powers: string[];
+  /** Perdas permanentes no máximo de um recurso (ex.: Sanidade perdida para sempre). */
+  perm: Record<string, number>;
 }
 
 /** Valida a definição inteira, incluindo se todas as fórmulas são seguras e coerentes. */
@@ -327,6 +386,7 @@ export function emptyValues(def: SystemDefinition): SystemValues {
     otherSpaces: 0,
     rituals: [],
     powers: [],
+    perm: {},
   };
 }
 
@@ -364,6 +424,16 @@ export function sanitizeValues(def: SystemDefinition, raw: RawValues | undefined
     if (!grades.has(g)) throw new FormulaError(`Grau de treinamento inválido em ${k}`);
     if (g !== def.grades[0]?.key) v.skills[k] = g;
   }
+  for (const res of def.resources) {
+    const p = r.perm?.[res.key];
+    if (p !== undefined && p !== 0) {
+      if (!Number.isInteger(p) || p < 0 || p > 999)
+        throw new FormulaError(`Perda permanente de ${res.label} inválida`);
+      v.perm[res.key] = p;
+    }
+  }
+  if (r.perm && Object.keys(r.perm).some((k) => !def.resources.some((x) => x.key === k)))
+    throw new FormulaError('Perda permanente em recurso desconhecido');
   for (const res of def.resources) {
     const x = r.current?.[res.key];
     if (x === undefined) continue;
@@ -473,7 +543,7 @@ function ctxFor(def: SystemDefinition, v: SystemValues): FormulaContext {
 }
 
 export interface ComputedSheet {
-  resources: { key: string; label: string; abbr: string; max: number; current: number }[];
+  resources: { key: string; label: string; abbr: string; max: number; current: number; lost?: number }[];
   derived: { key: string; label: string; value: number; suffix: string }[];
 }
 
@@ -481,8 +551,10 @@ export function computeSheet(def: SystemDefinition, v: SystemValues): ComputedSh
   const ctx = ctxFor(def, v);
   return {
     resources: def.resources.map((r) => {
-      const max = Math.max(0, Math.floor(evalFormula(r.max, ctx)));
-      return { key: r.key, label: r.label, abbr: r.abbr, max, current: v.current[r.key] ?? max };
+      const lost = v.perm?.[r.key] ?? 0;
+      const max = Math.max(0, Math.floor(evalFormula(r.max, ctx)) - lost);
+      const current = Math.min(v.current[r.key] ?? max, max);
+      return { key: r.key, label: r.label, abbr: r.abbr, max, current, ...(lost ? { lost } : {}) };
     }),
     derived: def.derived.map((d) => ({
       key: d.key,

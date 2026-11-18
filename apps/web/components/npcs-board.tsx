@@ -1,5 +1,6 @@
 'use client';
 
+import type { SystemDefinition, SystemValues } from '@rpg-ai/rules-engine';
 import type { NpcDetails, NpcDto } from '@rpg-ai/shared';
 import { Alert, Badge, Button, Card, CardContent, Field, Input, Textarea } from '@rpg-ai/ui';
 import { Eye, EyeOff, Lock, Plus, Trash2 } from 'lucide-react';
@@ -7,6 +8,8 @@ import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { api, json } from '@/lib/api';
 import { accessToken } from '@/lib/supabase';
+import { SaveToLibrary } from './characters-board';
+import { normalizeValues, SystemSheet } from './system-sheet';
 
 const EMPTY_DETAILS: NpcDetails = {
   personality: '',
@@ -15,16 +18,34 @@ const EMPTY_DETAILS: NpcDetails = {
   secrets: '',
   notes: '',
   stats: [],
+  sheet: { attributes: [], resources: [], inventory: [], notes: '' },
 };
 
-function NpcEditor({
+export interface NpcPayload {
+  name: string;
+  appearance: string;
+  publicDescription: string;
+  color: string;
+  revealed: boolean;
+  details: NpcDetails;
+}
+
+export function NpcEditor({
   campaignId,
   initial,
   onDone,
+  def = null,
+  persist,
+  hideReveal,
 }: {
-  campaignId: string;
+  campaignId?: string;
   initial: NpcDto | null;
   onDone: () => void;
+  /** Sistema de regras: com ele, o NPC ganha ficha completa (atributos, armas, rituais). */
+  def?: SystemDefinition | null;
+  /** Guardar em outro lugar (ex.: biblioteca) em vez da campanha. */
+  persist?: { save(p: NpcPayload): Promise<void>; remove?(): Promise<void> };
+  hideReveal?: boolean;
 }) {
   const router = useRouter();
   const [f, setF] = useState({
@@ -34,7 +55,10 @@ function NpcEditor({
     color: initial?.color ?? '#c9a24b',
     revealed: initial?.revealed ?? false,
   });
-  const [d, setD] = useState<NpcDetails>(initial?.details ?? EMPTY_DETAILS);
+  const [d, setD] = useState<NpcDetails>({ ...EMPTY_DETAILS, ...(initial?.details ?? {}) });
+  const [sys, setSys] = useState<SystemValues | undefined>(
+    def ? normalizeValues(def, d.sheet?.system) : undefined,
+  );
   const [error, setError] = useState<string>();
   const [saving, setSaving] = useState(false);
   const set = (patch: Partial<typeof f>) => setF((s) => ({ ...s, ...patch }));
@@ -45,7 +69,21 @@ function NpcEditor({
     setSaving(true);
     setError(undefined);
     try {
-      const body = json({ ...f, details: { ...d, stats: d.stats.filter((s) => s.label.trim()) } });
+      const payload: NpcPayload = {
+        ...f,
+        details: {
+          ...d,
+          stats: d.stats.filter((s) => s.label.trim()),
+          sheet: { ...EMPTY_DETAILS.sheet, ...d.sheet, ...(sys ? { system: sys } : {}) },
+        },
+      };
+      if (persist) {
+        await persist.save(payload);
+        router.refresh();
+        onDone();
+        return;
+      }
+      const body = json(payload);
       const token = await accessToken();
       if (initial) await api(`/campaigns/${campaignId}/npcs/${initial.id}`, token, { method: 'PATCH', body });
       else await api(`/campaigns/${campaignId}/npcs`, token, { method: 'POST', body });
@@ -59,7 +97,14 @@ function NpcEditor({
   }
 
   async function remove() {
-    if (!initial || !confirm(`Excluir ${initial.name}?`)) return;
+    if (persist?.remove) {
+      if (!confirm(`Excluir ${f.name || 'este NPC'}?`)) return;
+      await persist.remove();
+      router.refresh();
+      onDone();
+      return;
+    }
+    if (!initial || !campaignId || !confirm(`Excluir ${initial.name}?`)) return;
     await api(`/campaigns/${campaignId}/npcs/${initial.id}`, await accessToken(), { method: 'DELETE' });
     router.refresh();
     onDone();
@@ -88,20 +133,22 @@ function NpcEditor({
           </Field>
         </div>
 
-        <label className="flex cursor-pointer items-center gap-3 rounded-lg border border-line bg-surface-2/50 p-3">
-          <input
-            type="checkbox"
-            checked={f.revealed}
-            onChange={(e) => set({ revealed: e.target.checked })}
-            className="size-4 accent-[var(--color-gold)]"
-          />
-          <span className="text-sm">
-            <b>Revelado aos jogadores</b>
-            <span className="block text-xs text-ink-muted">
-              Jogadores veem nome, aparência e descrição pública. Nunca veem a parte secreta.
+        {!hideReveal && (
+          <label className="flex cursor-pointer items-center gap-3 rounded-lg border border-line bg-surface-2/50 p-3">
+            <input
+              type="checkbox"
+              checked={f.revealed}
+              onChange={(e) => set({ revealed: e.target.checked })}
+              className="size-4 accent-[var(--color-gold)]"
+            />
+            <span className="text-sm">
+              <b>Revelado aos jogadores</b>
+              <span className="block text-xs text-ink-muted">
+                Jogadores veem nome, aparência e descrição pública. Nunca veem a parte secreta.
+              </span>
             </span>
-          </span>
-        </label>
+          </label>
+        )}
 
         <div className="grid gap-4 md:grid-cols-2">
           <Field label="Aparência" htmlFor="npc-app">
@@ -210,6 +257,14 @@ function NpcEditor({
               ))}
             </div>
           </div>
+          {def && sys && (
+            <div className="rounded-xl border border-line/70 p-4" data-testid="npc-system-sheet">
+              <p className="mb-3 text-xs font-semibold uppercase tracking-[0.15em] text-gold/80">
+                Ficha de jogo ({def.name}) — só o mestre vê
+              </p>
+              <SystemSheet def={def} value={sys} onChange={setSys} />
+            </div>
+          )}
           <Field label="Anotações" htmlFor="npc-notes">
             <Textarea
               id="npc-notes"
@@ -223,10 +278,13 @@ function NpcEditor({
         {error && <Alert tone="error">{error}</Alert>}
         <div className="flex flex-wrap justify-between gap-2">
           <div>
-            {initial && (
+            {(initial || persist?.remove) && (
               <Button variant="danger" onClick={remove}>
                 Excluir
               </Button>
+            )}
+            {initial && campaignId && !persist && (
+              <SaveToLibrary campaignId={campaignId} body={{ npcId: initial.id }} />
             )}
           </div>
           <div className="flex gap-2">
@@ -247,10 +305,12 @@ export function NpcsBoard({
   campaignId,
   npcs,
   manager,
+  definition = null,
 }: {
   campaignId: string;
   npcs: NpcDto[];
   manager: boolean;
+  definition?: SystemDefinition | null;
 }) {
   const [editing, setEditing] = useState<NpcDto | 'new' | null>(null);
   if (editing && manager)
@@ -260,6 +320,7 @@ export function NpcsBoard({
         campaignId={campaignId}
         initial={editing === 'new' ? null : editing}
         onDone={() => setEditing(null)}
+        def={definition}
       />
     );
 

@@ -1,6 +1,6 @@
 import { type CampaignDto, GM_MODE_LABELS, ROLE_LABELS } from '@rpg-ai/shared';
 import { Badge, Button, Card, Ornament } from '@rpg-ai/ui';
-import { Plus, Users } from 'lucide-react';
+import { BookUser, FlaskConical, Plus, Users } from 'lucide-react';
 import Link from 'next/link';
 import { Sigil } from '@/components/brand';
 import { api } from '@/lib/api';
@@ -25,6 +25,34 @@ export default async function DashboardPage() {
             <Plus /> Nova campanha
           </Link>
         </Button>
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-2 animate-rise">
+        <Link
+          href="/library"
+          className="flex items-center gap-4 rounded-xl border border-line bg-surface/70 p-4 transition-colors hover:border-arcane-500/50"
+        >
+          <BookUser className="size-8 shrink-0 text-arcane-300" />
+          <span>
+            <span className="block font-display tracking-wide">Fichas</span>
+            <span className="text-sm text-ink-muted">
+              Crie personagens e NPCs (com criação guiada) e leve para qualquer campanha.
+            </span>
+          </span>
+        </Link>
+        <Link
+          href="/practice"
+          className="flex items-center gap-4 rounded-xl border border-line bg-surface/70 p-4 transition-colors hover:border-gold/50"
+          data-testid="practice-card"
+        >
+          <FlaskConical className="size-8 shrink-0 text-gold" />
+          <span>
+            <span className="block font-display tracking-wide">Mesa de treino</span>
+            <span className="text-sm text-ink-muted">
+              Campanha pronta só sua para testar tudo antes de jogar com o grupo.
+            </span>
+          </span>
+        </Link>
       </div>
 
       {campaigns.length === 0 ? (
@@ -73,9 +101,18 @@ function CampaignGrid({ campaigns, muted }: { campaigns: CampaignDto[]; muted?: 
                 {ROLE_LABELS[c.myRole]}
               </Badge>
             </div>
+            {c.sandbox && (
+              <p className="mb-3 inline-flex items-center gap-1.5 rounded-full border border-gold/40 bg-gold/10 px-2.5 py-1 text-xs text-gold-bright">
+                <FlaskConical className="size-3" /> Mesa de treino
+              </p>
+            )}
             {c.liveSession && (
-              <p className="mb-3 inline-flex items-center gap-2 rounded-full border border-blood/50 bg-blood/15 px-2.5 py-1 text-xs font-semibold text-blood-light" data-testid="card-live">
-                <span className="size-2 animate-pulse rounded-full bg-blood" /> Sessão {c.liveSession.number} ao vivo — entrar na mesa
+              <p
+                className="mb-3 inline-flex items-center gap-2 rounded-full border border-blood/50 bg-blood/15 px-2.5 py-1 text-xs font-semibold text-blood-light"
+                data-testid="card-live"
+              >
+                <span className="size-2 animate-pulse rounded-full bg-blood" /> Sessão {c.liveSession.number}{' '}
+                ao vivo — entrar na mesa
               </p>
             )}
             <p className="mb-6 line-clamp-2 min-h-10 text-sm text-ink-muted">

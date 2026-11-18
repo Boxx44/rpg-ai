@@ -26,6 +26,9 @@ import {
 import { NpcsController, NpcsService } from './modules/npcs';
 import { CombatController, CombatService } from './modules/combat';
 import { SessionsController, SessionsService } from './modules/sessions';
+import { SheetActions } from './modules/sheet-actions';
+import { LibraryController, LibraryService } from './modules/library';
+import { SandboxController, SandboxService } from './modules/sandbox';
 import { Realtime, RealtimeGateway } from './modules/realtime.gateway';
 
 export interface AppDeps {
@@ -52,6 +55,8 @@ export class AppModule implements NestModule {
         SystemsController,
         SessionsController,
         CombatController,
+        LibraryController,
+        SandboxController,
       ],
       providers: [
         { provide: APP_CONFIG, useValue: deps.config },
@@ -70,6 +75,9 @@ export class AppModule implements NestModule {
         SystemsService,
         SessionsService,
         CombatService,
+        SheetActions,
+        LibraryService,
+        SandboxService,
         DocumentQueue,
         { provide: FILE_STORAGE, useValue: createFileStorage(deps.config) },
         { provide: APP_GUARD, useClass: AuthGuard },

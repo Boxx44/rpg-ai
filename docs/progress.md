@@ -9,6 +9,28 @@
 
 ---
 
+## 18/11/2026 — Fichas, mesa de treino e regras completas
+
+**O que funciona (testado):**
+- **Fichas** (menu principal): biblioteca pessoal de personagens e NPCs, fora das campanhas.
+  - Criação guiada passo a passo: conceito, atributos com contador de pontos, origem, classe, perícias, equipamento e rituais iniciais, com a página do livro em cada passo.
+  - Ou ficha em branco.
+  - "Levar para a campanha" faz uma cópia, e "Guardar cópia nas Fichas" faz o caminho inverso.
+- **Mesa de treino** (menu "Treino"): um clique cria uma campanha particular pronta, com personagens de exemplo, NPC com ficha, mapa e criaturas. "Recomeçar do zero" limpa tudo.
+- **Ver como jogador** na mesa: o mestre confere o que os jogadores enxergam.
+- **NPC com ficha completa:** atributos, armas e rituais. No combate, o mestre ataca e conjura pelo NPC com um clique.
+- **Regras que faltavam:**
+  - 18 ameaças comuns do livro (bandido, policial, cultistas, animais…);
+  - perda permanente de Sanidade aplicada pelas regras e mostrada na ficha;
+  - Interlúdio (dormir, relaxar, refeições) com o cálculo do livro.
+
+**Testes:** rules-engine 56, shared 8, banco 45, API 76 e ponta a ponta 38, todos passando, além de lint e typecheck sem erros.
+
+**Ainda não feito:**
+- Efeito automático das habilidades de classe (por enquanto: nome, NEX e página).
+- Ajustes para celular.
+- Mestre por IA (os modos com IA exigem uma chave de IA paga).
+
 ## 18/11/2026 — Arsenal, rituais, habilidades e bestiário (Ordem Paranormal)
 
 **O que funciona (testado):**

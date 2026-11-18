@@ -98,7 +98,7 @@ describe('armas, rituais e criaturas do livro', () => {
       .send({ ritual: 'cineraria' })
       .expect(201);
     expect(f.body.messages).toHaveLength(1);
-    expect(f.body.notes.join(' ')).toMatch(/permanentemente/);
+    expect(f.body.notes.join(' ')).toMatch(/Sanidade máxima, para sempre/);
   });
 
   it('mestre coloca criatura do livro: PV, Iniciativa e ataque da ficha', async () => {

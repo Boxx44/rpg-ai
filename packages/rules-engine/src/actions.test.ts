@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildAttack, keptD20, multiplyDice, planRitual } from './actions';
+import { buildAttack, keptD20, multiplyDice, planRest, planRitual } from './actions';
 import { normalizeDice, rollDice, seededRng } from './dice';
 import { computeSheet, emptyValues, sanitizeValues, validateSystem } from './system';
 import { ORDEM_PARANORMAL } from './systems/ordem-paranormal';
@@ -102,5 +102,46 @@ describe('rituais', () => {
   });
   it('emptyValues tem listas vazias', () => {
     expect(emptyValues(def)).toMatchObject({ weapons: [], rituals: [], powers: [] });
+  });
+});
+
+describe('regras completadas', () => {
+  it('ameaças da realidade entram no bestiário com crítico das armas', () => {
+    const pol = def.creatures.find((c) => c.key === 'policial')!;
+    expect(pol).toMatchObject({ pv: 15, defesa: 19, element: null, page: 297 });
+    expect(pol.attacks[1]).toMatchObject({ name: 'Pistola', critRange: 18, test: '2d20kh1+5' });
+    expect(def.creatures.filter((c) => c.element === null)).toHaveLength(18);
+  });
+
+  it('perda permanente reduz o máximo do recurso', () => {
+    const v = base({ perm: { san: 3 } });
+    const san = computeSheet(def, v).resources.find((r) => r.key === 'san')!;
+    expect(san).toMatchObject({ lost: 3 });
+    expect(san.max).toBe(computeSheet(def, base()).resources.find((r) => r.key === 'san')!.max - 3);
+    expect(() => base({ perm: { san: -1 } })).toThrow();
+    expect(() => base({ perm: { mana: 1 } })).toThrow();
+    const f = planRitual(def, base({ rituals: ['cineraria'] }), 'cineraria', 'basic');
+    expect(f.permanentLoss).toBe(1);
+  });
+
+  it('interlúdio: dormir e relaxar conforme limite de PE e condição (p. 103)', () => {
+    const v = base({ current: { pv: 1, pe: 0, san: 2 } });
+    const r = planRest(def, v, {
+      sleep: true,
+      relax: true,
+      quality: 'confortavel',
+      meal: 'nutritivo',
+      relaxPartners: 2,
+    });
+    // NEX 25% → limite 5; confortável x2; nutritivo +1 nível só no PV
+    expect(r.gains.find((g) => g.key === 'pv')!.amount).toBe(15);
+    expect(r.gains.find((g) => g.key === 'pe')!.amount).toBe(10);
+    expect(r.gains.find((g) => g.key === 'san')!.amount).toBe(10 + 2);
+    const half = planRest(def, v, { sleep: true, relax: false, quality: 'precaria' });
+    expect(half.changes.pv).toBe(1 + 2);
+    expect(() => planRest(def, v, { sleep: false, relax: false, quality: 'normal' })).toThrow();
+    // não passa do máximo
+    const full = planRest(def, base(), { sleep: true, relax: false, quality: 'luxuosa' });
+    expect(full.gains.every((g) => g.amount === 0)).toBe(true);
   });
 });

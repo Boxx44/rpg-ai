@@ -148,3 +148,44 @@ Recomendação: livros enviados ficam privados ao usuário/organização; termos
 ### D-07 — Modelo de cobrança
 
 Não é necessário agora, mas o custo da IA é variável (ver risks.md). A arquitetura registra consumo por campanha e usuário desde o início, para permitir planos ou limites no futuro.
+
+**ADR-032 — Biblioteca de fichas, mesa de treino, NPC com ficha, criação guiada e regras completadas (migration 0008).**
+
+*Biblioteca (`library_sheets`)*
+- Cada usuário tem fichas próprias, fora das campanhas; o RLS só deixa o dono ver.
+- A ficha é validada pelo modelo de sistema (`SYSTEM_TEMPLATES`).
+- "Levar para a campanha" cria uma cópia e valida de novo. Personagem exige ser membro; NPC exige ser mestre.
+- Se a campanha usa outro sistema, o servidor recusa com uma mensagem clara. Se a campanha não tem sistema, a ficha entra só com a parte livre.
+- A ida inversa existe: "Guardar cópia nas Fichas" a partir da campanha.
+
+*Mesa de treino*
+- É uma campanha comum marcada `sandbox`, uma por pessoa (índice único). Só o criador marca, pela função `app_private.mark_sandbox`, porque as colunas de `campaigns` têm permissão por coluna.
+- Já vem com sistema de Ordem Paranormal (reaproveita o sistema do usuário que já tem livro, para que os links de página funcionem), 2 personagens, 2 NPCs (um com ficha completa), mapa compartilhado e mensagem de boas-vindas.
+- "Recomeçar do zero" apaga a mesa (exclusão lógica) e cria outra.
+
+*Ver como jogador*
+- É um filtro só na tela do mestre. Esconde mensagens do mestre, mapas não compartilhados, peças e combatentes ocultos, PV e fichas de inimigos, e NPCs não revelados.
+- Não é segurança: o mestre já tem esses dados, e o sigilo real continua no servidor (regra 6). Por isso não abrimos uma "sessão falsa" de jogador.
+
+*NPC com ficha*
+- A ficha fica em `npc_gm_details.sheet`, que só o mestre lê, e é validada como a de personagem.
+- Atacar, conjurar e descansar usam o mesmo serviço `SheetActions` dos personagens, com as mesmas regras.
+- No combate, o NPC entra com o PV da ficha e o mestre ganha botões de arma e ritual.
+
+*Criação guiada*
+- Segue `creation` do sistema:
+  - atributos: começam em 1, 4 pontos, um pode cair para 0 com +1 ponto, máximo 3 (p. 24);
+  - perícias por classe: escolhas, fixas e livres por fórmula (p. 35, 39, 43);
+  - proficiências e 3 rituais iniciais do Ocultista (p. 42).
+- No fim, abre o editor completo para ajustes.
+
+*Regras completadas*
+- As 18 ameaças da realidade (p. 294–299) foram transcritas página a página, com crítico próprio das armas.
+- Perda permanente de recurso (`perm`) reduz o máximo:
+  - Medo tira 1, 2 ou 3 de SAN conforme a forma;
+  - falhar o custo paranormal por 5 ou mais tira 1.
+  - Só regras e o mestre alteram esse valor; o jogador não pode apagar.
+- Interlúdio (p. 102–103):
+  - dormir recupera PV e PE e relaxar recupera SAN, ambos iguais ao limite de PE × condição (½, 1, 2 ou 3);
+  - refeições aumentam um nível ou somam +2 SAN;
+  - relaxar junto dá +1 por participante.

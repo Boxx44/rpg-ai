@@ -11,8 +11,14 @@ import {
   Post,
 } from '@nestjs/common';
 import { and, asc, type Database, eq, isNull, schema, type Tx, withUser } from '@rpg-ai/db';
+import { sanitizeValues, validateSystem } from '@rpg-ai/rules-engine';
 import {
+  attackSchema,
   canManageCampaign,
+  castSchema,
+  characterSheetSchema,
+  ERROR_CODES,
+  restSchema,
   type CreateNpcInput,
   createNpcSchema,
   npcDetailsSchema,
@@ -21,12 +27,15 @@ import {
   updateNpcSchema,
   WS_EVENTS,
 } from '@rpg-ai/shared';
-import { notFound } from '../common/errors';
+import type { z } from 'zod';
+import { AppError, notFound } from '../common/errors';
 import { Ctx, CurrentUser, parse, type RequestCtx } from '../common/http';
 import { type AuthUser, DB } from '../common/tokens';
 import { requireManager, requireMember } from './access';
 import { audit } from './audit';
+import { SystemsService } from './documents/systems';
 import { anyId, campaignId } from './ids';
+import { type ActorLoader, rulesError, SheetActions, sheetForCampaign, withCurrent } from './sheet-actions';
 import { Realtime } from './realtime.gateway';
 
 const n = schema.npcs;
@@ -37,7 +46,55 @@ export class NpcsService {
   constructor(
     @Inject(DB) private readonly db: Database,
     private readonly rt: Realtime,
+    private readonly systems: SystemsService,
+    private readonly actions: SheetActions,
   ) {}
+
+  /** NPC agindo pela ficha (só o mestre): atacar, conjurar, descansar. */
+  private loader(cid: string, id: string): ActorLoader {
+    return async (tx) => {
+      await requireManager(tx, cid);
+      const [row] = await tx
+        .select({ name: n.name, sheet: d.sheet })
+        .from(n)
+        .innerJoin(d, eq(d.npcId, n.id))
+        .where(and(eq(n.id, id), eq(n.campaignId, cid), isNull(n.deletedAt)));
+      if (!row) throw notFound('NPC');
+      const sys = await this.systems.campaignSystemTx(tx, cid);
+      if (!sys)
+        throw new AppError(ERROR_CODES.VALIDATION, 'A campanha ainda não tem um sistema de regras.', 400);
+      const def = validateSystem(sys.definition);
+      const sheet = characterSheetSchema.parse(row.sheet ?? {});
+      const values = rulesError(() => sanitizeValues(def, sheet.system));
+      return {
+        name: row.name,
+        def,
+        values,
+        save: async (t, current, permAdd) => {
+          const system = withCurrent(sheet.system ?? {}, values, current, permAdd);
+          await t
+            .update(d)
+            .set({ sheet: { ...sheet, system } })
+            .where(eq(d.npcId, id));
+        },
+      };
+    };
+  }
+
+  private async act<T>(cid: string, fn: () => Promise<T>) {
+    const r = await fn();
+    this.notify(cid);
+    return r;
+  }
+  attack(userId: string, cid: string, id: string, input: z.infer<typeof attackSchema>) {
+    return this.actions.attack(userId, cid, this.loader(cid, id), input);
+  }
+  cast(userId: string, cid: string, id: string, input: z.infer<typeof castSchema>) {
+    return this.act(cid, () => this.actions.cast(userId, cid, this.loader(cid, id), input));
+  }
+  rest(userId: string, cid: string, id: string, input: z.infer<typeof restSchema>) {
+    return this.act(cid, () => this.actions.rest(userId, cid, this.loader(cid, id), input));
+  }
 
   /** O RLS já esconde NPCs não revelados e os detalhes de quem não é mestre. */
   private async fetch(tx: Tx, cid: string, id?: string): Promise<NpcDto[]> {
@@ -57,7 +114,9 @@ export class NpcsService {
       publicDescription: r.publicDescription,
       color: r.color,
       revealed: r.revealed,
-      ...(manager ? { details: npcDetailsSchema.parse(det ? { ...det, stats: det.stats } : {}) } : {}),
+      ...(manager
+        ? { details: npcDetailsSchema.parse(det ? { ...det, stats: det.stats, sheet: det.sheet ?? {} } : {}) }
+        : {}),
       updatedAt: r.updatedAt.toISOString(),
     }));
   }
@@ -75,6 +134,7 @@ export class NpcsService {
     const dto = await withUser(this.db, userId, async (tx) => {
       await requireManager(tx, cid);
       const { details, ...base } = input;
+      details.sheet = await sheetForCampaign(this.systems, tx, cid, details.sheet);
       const [row] = await tx
         .insert(n)
         .values({ campaignId: cid, createdBy: userId, ...base })
@@ -99,6 +159,7 @@ export class NpcsService {
       const [cur] = await this.fetch(tx, cid, id);
       if (!cur) throw notFound('NPC');
       const { details, ...base } = input;
+      if (details) details.sheet = await sheetForCampaign(this.systems, tx, cid, details.sheet);
       if (Object.keys(base).length) await tx.update(n).set(base).where(eq(n.id, id));
       if (details) await tx.update(d).set(details).where(eq(d.npcId, id));
       await audit(tx, ctx, {
@@ -150,6 +211,18 @@ export class NpcsController {
     @Ctx() ctx: RequestCtx,
   ) {
     return this.svc.update(u.id, campaignId(id), anyId(nid), parse(updateNpcSchema, b), ctx);
+  }
+  @Post(':npcId/attack')
+  attack(@CurrentUser() u: AuthUser, @Param('id') id: string, @Param('npcId') c: string, @Body() b: unknown) {
+    return this.svc.attack(u.id, campaignId(id), anyId(c), parse(attackSchema, b));
+  }
+  @Post(':npcId/cast')
+  cast(@CurrentUser() u: AuthUser, @Param('id') id: string, @Param('npcId') c: string, @Body() b: unknown) {
+    return this.svc.cast(u.id, campaignId(id), anyId(c), parse(castSchema, b));
+  }
+  @Post(':npcId/rest')
+  rest(@CurrentUser() u: AuthUser, @Param('id') id: string, @Param('npcId') c: string, @Body() b: unknown) {
+    return this.svc.rest(u.id, campaignId(id), anyId(c), parse(restSchema, b));
   }
   @Delete(':npcId')
   @HttpCode(204)

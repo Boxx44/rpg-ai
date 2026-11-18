@@ -7,12 +7,16 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { supabaseBrowser } from '@/lib/supabase';
 
-const links = [{ href: '/dashboard', label: 'Campanhas', match: ['/dashboard', '/campaigns'] }];
+const links = [
+  { href: '/dashboard', label: 'Campanhas', match: ['/dashboard', '/campaigns'] },
+  { href: '/library', label: 'Fichas', match: ['/library'] },
+  { href: '/practice', label: 'Treino', match: ['/practice'] },
+];
 
 export function NavLinks() {
   const path = usePathname();
   return (
-    <nav className="hidden items-center gap-1 sm:flex">
+    <nav className="flex items-center gap-0.5 sm:gap-1" aria-label="Principal">
       {links.map((l) => {
         const active = l.match.some((m) => path.startsWith(m));
         return (
@@ -20,7 +24,7 @@ export function NavLinks() {
             key={l.href}
             href={l.href}
             className={cn(
-              'relative rounded-md px-3 py-2 text-sm transition-colors',
+              'relative rounded-md px-2 py-2 text-sm transition-colors sm:px-3',
               active ? 'text-ink' : 'text-ink-muted hover:text-ink',
             )}
           >

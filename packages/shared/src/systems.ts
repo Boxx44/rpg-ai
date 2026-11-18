@@ -68,6 +68,8 @@ export interface CampaignSystemDto {
   hasBook: boolean;
   /** Livro pronto para consulta (abrir páginas citadas pelas regras). */
   bookId: string | null;
+  /** Modelo de origem (ex.: ordem_paranormal), quando houver. */
+  templateId: string | null;
 }
 
 export interface RuleSearchHitDto {

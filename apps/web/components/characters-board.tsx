@@ -30,27 +30,89 @@ function SectionTitle({ children, action }: { children: React.ReactNode; action?
   );
 }
 
-function SheetEditor({
+export interface SheetData {
+  name: string;
+  concept: string;
+  color: string;
+  sheet: CharacterSheet;
+}
+
+/** Onde a ficha é guardada: campanha (padrão) ou outro lugar, como a biblioteca. */
+export interface SheetPersistence {
+  save(data: SheetData): Promise<void>;
+  remove?(): Promise<void>;
+}
+
+/** Guarda uma cópia (de personagem ou NPC da campanha) na biblioteca pessoal de fichas. */
+export function SaveToLibrary({
+  campaignId,
+  body,
+}: {
+  campaignId: string;
+  body: { characterId?: string; npcId?: string };
+}) {
+  const [state, setState] = useState<'idle' | 'busy' | 'done' | 'error'>('idle');
+  return (
+    <Button
+      variant="ghost"
+      className="ml-2"
+      loading={state === 'busy'}
+      disabled={state === 'done'}
+      onClick={async () => {
+        setState('busy');
+        try {
+          await api(`/campaigns/${campaignId}/library`, await accessToken(), {
+            method: 'POST',
+            body: json(body),
+          });
+          setState('done');
+        } catch {
+          setState('error');
+        }
+      }}
+    >
+      {state === 'done'
+        ? 'Guardado nas Fichas ✓'
+        : state === 'error'
+          ? 'Erro — tentar de novo'
+          : 'Guardar cópia nas Fichas'}
+    </Button>
+  );
+}
+
+export function SheetEditor({
   initial,
   campaignId,
   onDone,
   def,
+  seed,
+  persist,
+  extra,
+  nameLabel = 'Nome',
+  deleteLabel,
 }: {
   initial: CharacterDto | null;
-  campaignId: string;
+  campaignId?: string;
   onDone: () => void;
   def: SystemDefinition | null;
+  /** Valores iniciais quando não é um personagem de campanha (biblioteca, criação guiada). */
+  seed?: Partial<SheetData>;
+  persist?: SheetPersistence;
+  /** Campos extras (ex.: dados de NPC) logo acima das anotações. */
+  extra?: React.ReactNode;
+  nameLabel?: string;
+  deleteLabel?: string;
 }) {
   const router = useRouter();
   const readOnly = initial ? !initial.canEdit : false;
-  const [name, setName] = useState(initial?.name ?? '');
-  const [concept, setConcept] = useState(initial?.concept ?? '');
-  const [color, setColor] = useState(initial?.color ?? '#7c4ff0');
-  const [sheet, setSheet] = useState<CharacterSheet>(initial?.sheet ?? EMPTY_SHEET);
+  const [name, setName] = useState(initial?.name ?? seed?.name ?? '');
+  const [concept, setConcept] = useState(initial?.concept ?? seed?.concept ?? '');
+  const [color, setColor] = useState(initial?.color ?? seed?.color ?? '#7c4ff0');
+  const [sheet, setSheet] = useState<CharacterSheet>(initial?.sheet ?? seed?.sheet ?? EMPTY_SHEET);
   const [error, setError] = useState<string>();
   const [saving, setSaving] = useState(false);
   const [sys, setSys] = useState<SystemValues | undefined>(
-    def ? normalizeValues(def, initial?.sheet.system) : undefined,
+    def ? normalizeValues(def, initial?.sheet.system ?? seed?.sheet?.system) : undefined,
   );
   const [rolling, setRolling] = useState<string | null>(null);
   const [lastRoll, setLastRoll] = useState<{
@@ -61,7 +123,7 @@ function SheetEditor({
   } | null>(null);
 
   async function roll(t: RollTarget) {
-    if (!initial) return;
+    if (!initial || !campaignId) return;
     const k = 'skill' in t ? t.skill : t.attribute;
     setRolling(k);
     setError(undefined);
@@ -102,6 +164,12 @@ function SheetEditor({
       ...(sys ? { system: sys } : {}),
     };
     try {
+      if (persist) {
+        await persist.save({ name, concept, color, sheet: clean });
+        router.refresh();
+        onDone();
+        return;
+      }
       const token = await accessToken();
       if (initial)
         await api(`/campaigns/${campaignId}/characters/${initial.id}`, token, {
@@ -123,6 +191,13 @@ function SheetEditor({
   }
 
   async function remove() {
+    if (persist?.remove) {
+      if (!confirm(`Excluir ${name || 'esta ficha'}?`)) return;
+      await persist.remove();
+      router.refresh();
+      onDone();
+      return;
+    }
     if (!initial || !confirm(`Excluir ${initial.name}?`)) return;
     await api(`/campaigns/${campaignId}/characters/${initial.id}`, await accessToken(), { method: 'DELETE' });
     router.refresh();
@@ -133,7 +208,7 @@ function SheetEditor({
     <Card>
       <CardContent className="space-y-6 pt-6" data-testid="character-editor">
         <div className="grid gap-4 sm:grid-cols-[1fr_1fr_auto]">
-          <Field label="Nome" htmlFor="ch-name">
+          <Field label={nameLabel} htmlFor="ch-name">
             <Input
               id="ch-name"
               value={name}
@@ -183,7 +258,7 @@ function SheetEditor({
                 ))}
               </Alert>
             )}
-            {!initial && (
+            {!initial && campaignId && (
               <p className="text-xs text-ink-faint">Salve a ficha para poder rolar os testes direto daqui.</p>
             )}
           </>
@@ -436,6 +511,7 @@ function SheetEditor({
           </div>
         </section>
 
+        {extra}
         <Field label="Anotações e história" htmlFor="ch-notes">
           <Textarea
             id="ch-notes"
@@ -450,10 +526,13 @@ function SheetEditor({
         {error && <Alert tone="error">{error}</Alert>}
         <div className="flex flex-wrap justify-between gap-2">
           <div>
-            {initial?.canEdit && (
+            {(initial?.canEdit || persist?.remove) && (
               <Button variant="danger" onClick={remove}>
-                Excluir
+                {deleteLabel ?? 'Excluir'}
               </Button>
+            )}
+            {initial && campaignId && !persist && (
+              <SaveToLibrary campaignId={campaignId} body={{ characterId: initial.id }} />
             )}
           </div>
           <div className="flex gap-2">

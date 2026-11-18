@@ -65,6 +65,7 @@ export const campaigns = pgTable('campaigns', {
   gmMode: text('gm_mode').$type<'human' | 'ai' | 'assistant'>().notNull().default('human'),
   status: text('status').$type<'active' | 'archived'>().notNull().default('active'),
   systemVersionId: uuid('system_version_id'),
+  sandbox: boolean('sandbox').notNull().default(false),
   createdAt: ts('created_at').notNull().defaultNow(),
   updatedAt: ts('updated_at').notNull().defaultNow(),
   deletedAt: ts('deleted_at'),
@@ -149,6 +150,7 @@ export const npcGmDetails = pgTable('npc_gm_details', {
   secrets: text('secrets').notNull().default(''),
   notes: text('notes').notNull().default(''),
   stats: jsonb('stats').notNull().default([]),
+  sheet: jsonb('sheet').notNull().default({}),
   updatedAt: ts('updated_at').notNull().defaultNow(),
 });
 
@@ -308,4 +310,19 @@ export const combatantGmDetails = pgTable('combatant_gm_details', {
   campaignId: uuid('campaign_id').notNull(),
   hpCurrent: integer('hp_current').notNull().default(0),
   hpMax: integer('hp_max').notNull().default(0),
+});
+
+export const librarySheets = pgTable('library_sheets', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  ownerId: uuid('owner_id').notNull(),
+  kind: text('kind').$type<'character' | 'npc'>().notNull(),
+  name: text('name').notNull(),
+  concept: text('concept').notNull().default(''),
+  color: text('color').notNull().default('#8b5cf6'),
+  systemTemplate: text('system_template'),
+  sheet: jsonb('sheet').notNull().default({}),
+  npc: jsonb('npc').notNull().default({}),
+  createdAt: ts('created_at').notNull().defaultNow(),
+  updatedAt: ts('updated_at').notNull().defaultNow(),
+  deletedAt: ts('deleted_at'),
 });

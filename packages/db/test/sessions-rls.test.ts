@@ -23,10 +23,12 @@ beforeAll(async () => {
   pl = await createAuthUser(sql, 'pl@s.com');
   out = await createAuthUser(sql, 'out@s.com');
   const [org] = await sql`select id from organizations where owner_id = ${gm}`;
-  const [c] = await sql`insert into campaigns (organization_id, created_by, name) values (${org!.id}, ${gm}, 'C') returning id`;
+  const [c] =
+    await sql`insert into campaigns (organization_id, created_by, name) values (${org!.id}, ${gm}, 'C') returning id`;
   cid = c!.id;
   await sql`insert into campaign_members (campaign_id, user_id, role) values (${cid}, ${gm}, 'owner'), (${cid}, ${pl}, 'player')`;
-  const [m] = await sql`insert into maps (campaign_id, created_by, name) values (${cid}, ${gm}, 'Cripta') returning id`;
+  const [m] =
+    await sql`insert into maps (campaign_id, created_by, name) values (${cid}, ${gm}, 'Cripta') returning id`;
   mapId = m!.id;
 });
 afterAll(async () => {
@@ -37,11 +39,17 @@ afterAll(async () => {
 describe('sessões', () => {
   let sid: string;
   it('jogador não inicia; mestre inicia; só uma ao vivo', async () => {
-    await expect(as(pl, (tx) => tx`select app_private.start_session(${cid}, 'x')`)).rejects.toThrow(/forbidden/);
+    await expect(as(pl, (tx) => tx`select app_private.start_session(${cid}, 'x')`)).rejects.toThrow(
+      /forbidden/,
+    );
     const [r] = await as(gm, (tx) => tx`select app_private.start_session(${cid}, 'O começo') as id`);
     sid = r!.id;
-    await expect(as(gm, (tx) => tx`select app_private.start_session(${cid}, 'outra')`)).rejects.toThrow(/already live/);
-    expect(await as(pl, (tx) => tx`select number, status from sessions`)).toEqual([{ number: 1, status: 'live' }]);
+    await expect(as(gm, (tx) => tx`select app_private.start_session(${cid}, 'outra')`)).rejects.toThrow(
+      /already live/,
+    );
+    expect(await as(pl, (tx) => tx`select number, status from sessions`)).toEqual([
+      { number: 1, status: 'live' },
+    ]);
     expect(await as(out, (tx) => tx`select id from sessions`)).toHaveLength(0);
   });
 
@@ -55,7 +63,9 @@ describe('sessões', () => {
   });
 
   it('cena: só o mestre troca, e o mapa passa a ser visível aos jogadores', async () => {
-    await expect(as(pl, (tx) => tx`select app_private.set_scene(${sid}, ${mapId})`)).rejects.toThrow(/forbidden/);
+    await expect(as(pl, (tx) => tx`select app_private.set_scene(${sid}, ${mapId})`)).rejects.toThrow(
+      /forbidden/,
+    );
     expect(await as(pl, (tx) => tx`select id from maps`)).toHaveLength(0);
     await as(gm, (tx) => tx`select app_private.set_scene(${sid}, ${mapId})`);
     expect(await as(pl, (tx) => tx`select id from maps`)).toHaveLength(1);
@@ -64,7 +74,9 @@ describe('sessões', () => {
   });
 
   it('jogador não altera sessão; mestre encerra; depois disso mensagens ficam fora de sessão', async () => {
-    await expect(as(pl, (tx) => tx`update sessions set status = 'ended'`)).rejects.toThrow(/permission denied/);
+    await expect(as(pl, (tx) => tx`update sessions set status = 'ended'`)).rejects.toThrow(
+      /permission denied/,
+    );
     expect(await as(pl, (tx) => tx`update sessions set summary = 'x' returning id`)).toHaveLength(0);
     await expect(as(pl, (tx) => tx`select app_private.end_session(${sid}, '')`)).rejects.toThrow(/forbidden/);
     await as(gm, (tx) => tx`select app_private.end_session(${sid}, 'Grupo entrou na cripta.')`);
