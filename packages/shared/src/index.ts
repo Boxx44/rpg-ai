@@ -92,6 +92,8 @@ export interface CampaignDto {
   myRole: CampaignRole;
   memberCount: number;
   system: { id: string; name: string } | null;
+  /** Sessão ao vivo agora (se houver). */
+  liveSession: { id: string; number: number; title: string } | null;
   createdAt: string;
   updatedAt: string;
 }

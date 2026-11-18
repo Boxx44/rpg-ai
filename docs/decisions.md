@@ -58,6 +58,8 @@ Formato: cada decisão tem contexto, escolha e motivo. "Pendente" = precisa da s
 
 **ADR-027 — Instalação no Windows por scripts de dois cliques.** `INSTALAR.bat` instala Node.js e Docker Desktop via winget, dependências, compila e prepara o banco; `INICIAR.bat` sobe tudo e abre o navegador. O banco e o Redis rodam no Docker (a extensão pgvector exigida pelas migrations vem pronta na imagem).
 
+**ADR-028 — Preparar x Jogar com sessões ao vivo (migration 0005).** A campanha passa a ter dois espaços: *Preparar* (personagens, NPCs, mapas) e *Jogar* (a mesa). Jogar acontece dentro de uma **sessão** (`sessions`), que só o mestre inicia e encerra, e cada campanha tem no máximo uma ao vivo (índice único parcial). Mensagens e rolagens recebem `session_id` automaticamente por gatilho no banco, para que o cliente não possa forjá-lo. O mestre escolhe o mapa da cena (`set_scene`), que é compartilhado automaticamente, e os jogadores o seguem. O início da sessão é avisado na sala pessoal `u:<id>` de cada membro, de modo que chega mesmo a quem está em outra página. O histórico mostra o resumo escrito pelo mestre e a crônica de cada sessão.
+
 ## Decisões pendentes (preciso da sua escolha)
 
 ### D-01 — Provedor principal de IA (LLM)

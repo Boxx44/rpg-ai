@@ -65,3 +65,24 @@ export function useCampaignRealtime(campaignId: string, handlers: Handlers, onRe
 
   return status;
 }
+
+/** Conexão "pessoal": recebe avisos para o usuário em qualquer página (ex.: sessão iniciada). */
+export function useUserRealtime(handlers: Handlers) {
+  const ref = useRef(handlers);
+  ref.current = handlers;
+  useEffect(() => {
+    const socket = io(`${env.apiUrl}/realtime`, {
+      transports: ['websocket'],
+      auth: (cb) => {
+        accessToken().then(
+          (token) => cb({ token }),
+          () => cb({}),
+        );
+      },
+    });
+    socket.onAny((event: string, payload: unknown) => (ref.current[event] as ((p: unknown) => void) | undefined)?.(payload));
+    return () => {
+      socket.close();
+    };
+  }, []);
+}

@@ -38,6 +38,7 @@ export class ChatService {
       .select({
         id: msg.id,
         campaignId: msg.campaignId,
+        sessionId: msg.sessionId,
         kind: msg.kind,
         content: msg.content,
         visibility: msg.visibility,
@@ -61,6 +62,7 @@ export class ChatService {
     return rows.reverse().map((r) => ({
       id: r.id,
       campaignId: r.campaignId,
+      sessionId: r.sessionId,
       kind: r.kind,
       content: r.content,
       visibility: r.visibility,
@@ -80,12 +82,13 @@ export class ChatService {
     }));
   }
 
-  list(userId: string, cid: string, q: { before?: number; after?: number; limit: number }) {
+  list(userId: string, cid: string, q: { before?: number; after?: number; limit: number; session?: string }) {
     return withUser(this.db, userId, async (tx) => {
       await requireMember(tx, cid);
       const conds = [eq(msg.campaignId, cid)];
       if (q.before) conds.push(sql`${msg.id} < ${q.before}`);
       if (q.after !== undefined) conds.push(sql`${msg.id} > ${q.after}`);
+      if (q.session) conds.push(eq(msg.sessionId, q.session));
       return this.load(tx, and(...conds), q.limit);
     });
   }

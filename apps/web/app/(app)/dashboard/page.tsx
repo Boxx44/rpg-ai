@@ -73,6 +73,11 @@ function CampaignGrid({ campaigns, muted }: { campaigns: CampaignDto[]; muted?: 
                 {ROLE_LABELS[c.myRole]}
               </Badge>
             </div>
+            {c.liveSession && (
+              <p className="mb-3 inline-flex items-center gap-2 rounded-full border border-blood/50 bg-blood/15 px-2.5 py-1 text-xs font-semibold text-blood-light" data-testid="card-live">
+                <span className="size-2 animate-pulse rounded-full bg-blood" /> Sessão {c.liveSession.number} ao vivo — entrar na mesa
+              </p>
+            )}
             <p className="mb-6 line-clamp-2 min-h-10 text-sm text-ink-muted">
               {c.description || 'Sem descrição.'}
             </p>

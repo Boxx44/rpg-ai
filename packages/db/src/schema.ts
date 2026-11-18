@@ -194,6 +194,7 @@ export const diceRolls = pgTable('dice_rolls', {
   result: jsonb('result').notNull(),
   total: integer('total').notNull(),
   visibility: text('visibility').$type<'public' | 'gm'>().notNull(),
+  sessionId: uuid('session_id'),
   createdAt: ts('created_at').notNull().defaultNow(),
 });
 
@@ -208,6 +209,7 @@ export const chatMessages = pgTable('chat_messages', {
   content: text('content').notNull().default(''),
   rollId: uuid('roll_id'),
   visibility: text('visibility').$type<'public' | 'gm'>().notNull(),
+  sessionId: uuid('session_id'),
   createdAt: ts('created_at').notNull().defaultNow(),
 });
 
@@ -255,4 +257,17 @@ export const documentPages = pgTable('document_pages', {
   systemId: uuid('system_id').notNull(),
   pageNumber: integer('page_number').notNull(),
   text: text('text').notNull(),
+});
+
+export const sessions = pgTable('sessions', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  campaignId: uuid('campaign_id').notNull(),
+  number: integer('number').notNull(),
+  title: text('title').notNull().default(''),
+  status: text('status').$type<'live' | 'ended'>().notNull().default('live'),
+  activeMapId: uuid('active_map_id'),
+  summary: text('summary').notNull().default(''),
+  startedBy: uuid('started_by').notNull(),
+  startedAt: ts('started_at').notNull().defaultNow(),
+  endedAt: ts('ended_at'),
 });

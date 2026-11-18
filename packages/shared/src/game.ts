@@ -27,6 +27,7 @@ export const messagesQuerySchema = z.object({
   before: z.coerce.number().int().positive().optional(),
   after: z.coerce.number().int().nonnegative().optional(),
   limit: z.coerce.number().int().min(1).max(100).default(50),
+  session: z.string().uuid().optional(),
 });
 
 export interface RollDieDto {
@@ -43,6 +44,7 @@ export type RollPartDto =
 export interface ChatMessageDto {
   id: number;
   campaignId: string;
+  sessionId: string | null;
   kind: 'text' | 'roll';
   content: string;
   visibility: Visibility;
@@ -301,4 +303,34 @@ export const WS_EVENTS = {
   npcsChanged: 'npcs.changed',
   charactersChanged: 'characters.changed',
   rejoin: 'campaign.rejoin',
+  sessionStarted: 'session.started',
+  sessionEnded: 'session.ended',
+  sceneChanged: 'scene.changed',
 } as const;
+
+// ───────────── Sessões ─────────────
+export const startSessionSchema = z.object({ title: z.string().trim().max(120).default('') });
+export const endSessionSchema = z.object({ summary: z.string().trim().max(8000).default('') });
+export const sceneSchema = z.object({ mapId: z.string().uuid().nullable() });
+export const updateSessionSchema = z
+  .object({ title: z.string().trim().max(120).optional(), summary: z.string().trim().max(8000).optional() })
+  .refine((v) => Object.keys(v).length > 0, { message: 'Nenhum campo para atualizar' });
+
+export interface SessionDto {
+  id: string;
+  campaignId: string;
+  number: number;
+  title: string;
+  status: 'live' | 'ended';
+  activeMapId: string | null;
+  summary: string;
+  startedAt: string;
+  endedAt: string | null;
+  messageCount: number;
+}
+
+export interface SessionStartedEvent {
+  campaignId: string;
+  campaignName: string;
+  session: SessionDto;
+}

@@ -159,6 +159,13 @@ Migration `0004`: correção das políticas de exclusão lógica (ver ADR-026).
 
 O restante (regras extraídas, sessões, combate, memória, IA) entra nas fases correspondentes.
 
+## Sessões de jogo (migration `0005_sessions.sql`)
+
+- `sessions`: número sequencial por campanha, título, status `live`/`ended`, mapa da cena (`active_map_id`), resumo, quem iniciou e as datas. Índice único parcial: no máximo uma sessão `live` por campanha.
+- `chat_messages.session_id` e `dice_rolls.session_id` são preenchidos pelo gatilho `app_private.attach_live_session` (BEFORE INSERT) com a sessão ao vivo da campanha.
+- Funções (SECURITY DEFINER, só mestre/co-mestre): `start_session` (erro 23505 se já houver uma ao vivo), `set_scene` (também marca o mapa como compartilhado), `end_session`.
+- RLS: membros leem; mestres podem editar só `title` e `summary`.
+
 ## Backups
 
 Supabase Pro: backups diários (ponto no tempo opcional, pago à parte). Além disso: dump lógico semanal para armazenamento externo e teste de restauração trimestral (Fase 9).

@@ -2,6 +2,7 @@ import type { MeDto } from '@rpg-ai/shared';
 import { Avatar } from '@rpg-ai/ui';
 import Link from 'next/link';
 import { Logo } from '@/components/brand';
+import { LiveSessionNotifier } from '@/components/live-notifier';
 import { NavLinks, SignOutButton } from '@/components/nav';
 import { api } from '@/lib/api';
 import { serverToken } from '@/lib/supabase-server';
@@ -28,6 +29,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         </div>
       </header>
       <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-12">{children}</main>
+      <LiveSessionNotifier />
     </div>
   );
 }

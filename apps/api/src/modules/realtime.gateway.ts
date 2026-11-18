@@ -78,6 +78,9 @@ export class RealtimeGateway implements OnGatewayConnection {
     // `alsoUser` é sempre o autor da ação, que acabou de ter a participação verificada.
     this.server?.to(rooms).emit(event, payload);
   }
+  toUsers(userIds: string[], event: string, payload: unknown) {
+    if (userIds.length) this.server?.to(userIds.map(room.user)).emit(event, payload);
+  }
   /** Remove o usuário das salas da campanha (expulso, saiu ou mudou de papel) e pede para reentrar. */
   async resetMembership(cid: string, userId: string) {
     if (!this.server) return;
@@ -98,5 +101,8 @@ export class Realtime {
   }
   resetMembership(cid: string, userId: string) {
     return this.gw.resetMembership(cid, userId);
+  }
+  users(userIds: string[], event: string, payload: unknown) {
+    this.gw.toUsers(userIds, event, payload);
   }
 }

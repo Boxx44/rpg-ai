@@ -6,6 +6,7 @@ import type {
   MapSummaryDto,
   MeDto,
   NpcDto,
+  SessionDto,
 } from '@rpg-ai/shared';
 import { GameTable } from '@/components/game-table';
 import { pageApi as api } from '@/lib/page-api';
@@ -27,6 +28,7 @@ export default async function TablePage({ params }: { params: Promise<{ id: stri
     api<CharacterDto[]>(`/campaigns/${id}/characters`, token),
     api<CampaignSystemDto | null>(`/campaigns/${id}/system`, token),
   ]);
+  const live = await api<SessionDto | null>(`/campaigns/${id}/sessions/live`, token);
   return (
     <GameTable
       campaignId={id}
@@ -37,6 +39,7 @@ export default async function TablePage({ params }: { params: Promise<{ id: stri
       initialNpcs={npcs}
       initialCharacters={characters}
       system={system}
+      initialLive={live}
     />
   );
 }

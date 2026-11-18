@@ -247,6 +247,8 @@ Existem hoje: `apps/web`, `apps/api`, `packages/{db,shared,ui,logger,rules-engin
 
 **Mesa de jogo (tempo real):** o navegador conecta ao namespace `/realtime` com o token, entra na sala `c:<campanha>` (mestres também em `c:<campanha>:gm`). Ações vão pela API REST; a API grava no banco e distribui o evento para a sala certa (`chat.message`, `token.moved`, `maps.changed`, `npcs.changed`, `characters.changed`). Ao reconectar, o cliente busca o que perdeu (`GET /messages?after=`).
 
+**Sessões (Preparar x Jogar):** `campaigns/:id/sessions` (listar, `live`, iniciar, `:sid/scene`, `:sid/end`, editar resumo). Ao iniciar, a API avisa cada membro na sala pessoal `u:<usuário>` (`session.started`), que o componente `LiveSessionNotifier` escuta em qualquer página. Na sala da campanha circulam `scene.changed` e `session.ended`. O mapa da cena é definido pelo mestre e os jogadores apenas o seguem.
+
 **Fluxo de autenticação implementado:** o navegador faz login no Supabase Auth → recebe um token (JWT) → envia o token à API → a API verifica a assinatura (segredo HS256 ou chaves públicas JWKS) → confirma que a conta existe e está ativa → executa a consulta no banco com o papel do usuário (RLS ativo).
 
 ## 8. Dependências externas

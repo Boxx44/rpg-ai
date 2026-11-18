@@ -44,6 +44,9 @@ export class CampaignsService {
         status: c.status,
         myRole: m.role,
         memberCount: sql<number>`(select count(*)::int from campaign_members x where x.campaign_id = ${c.id})`,
+        liveSessionId: schema.sessions.id,
+        liveSessionNumber: schema.sessions.number,
+        liveSessionTitle: schema.sessions.title,
         systemId: schema.rpgSystems.id,
         systemName: schema.rpgSystems.name,
         createdAt: c.createdAt,
@@ -53,10 +56,15 @@ export class CampaignsService {
       .innerJoin(m, and(eq(m.campaignId, c.id), eq(m.userId, userId)))
       .leftJoin(schema.systemVersions, eq(schema.systemVersions.id, c.systemVersionId))
       .leftJoin(schema.rpgSystems, eq(schema.rpgSystems.id, schema.systemVersions.systemId))
+      .leftJoin(schema.sessions, and(eq(schema.sessions.campaignId, c.id), eq(schema.sessions.status, 'live')))
       .where(and(isNull(c.deletedAt), id ? eq(c.id, id) : undefined))
       .orderBy(desc(c.updatedAt));
-    return rows.map(({ systemId, systemName, ...r }) => ({
+    return rows.map(({ systemId, systemName, liveSessionId, liveSessionNumber, liveSessionTitle, ...r }) => ({
       ...r,
+      liveSession:
+        liveSessionId && liveSessionNumber !== null
+          ? { id: liveSessionId, number: liveSessionNumber, title: liveSessionTitle ?? '' }
+          : null,
       system: systemId && systemName ? { id: systemId, name: systemName } : null,
       createdAt: r.createdAt.toISOString(),
       updatedAt: r.updatedAt.toISOString(),

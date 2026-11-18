@@ -24,6 +24,7 @@ import {
   SystemsService,
 } from './modules/documents/systems';
 import { NpcsController, NpcsService } from './modules/npcs';
+import { SessionsController, SessionsService } from './modules/sessions';
 import { Realtime, RealtimeGateway } from './modules/realtime.gateway';
 
 export interface AppDeps {
@@ -48,6 +49,7 @@ export class AppModule implements NestModule {
         NpcsController,
         MapsController,
         SystemsController,
+        SessionsController,
       ],
       providers: [
         { provide: APP_CONFIG, useValue: deps.config },
@@ -64,6 +66,7 @@ export class AppModule implements NestModule {
         NpcsService,
         MapsService,
         SystemsService,
+        SessionsService,
         DocumentQueue,
         { provide: FILE_STORAGE, useValue: createFileStorage(deps.config) },
         { provide: APP_GUARD, useClass: AuthGuard },

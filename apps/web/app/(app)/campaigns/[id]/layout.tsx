@@ -41,7 +41,7 @@ export default async function CampaignLayout({
             {campaign.status === 'archived' && <Badge>Arquivada</Badge>}
           </div>
         </div>
-        <CampaignTabs campaignId={id} manager={canManageCampaign(campaign.myRole)} />
+        <CampaignTabs campaignId={id} manager={canManageCampaign(campaign.myRole)} live={!!campaign.liveSession} />
       </div>
       {children}
     </div>

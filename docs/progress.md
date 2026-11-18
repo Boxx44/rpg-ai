@@ -9,6 +9,22 @@
 
 ---
 
+## 17/11/2026 — Preparar x Jogar (sessões ao vivo)
+
+**O que funciona (testado):**
+- As abas da campanha estão separadas em **Jogar** (Mesa) e **Preparar** (Personagens, NPCs, Mapas), além de Sessões e Gerenciar.
+- O mestre clica em **Iniciar sessão** (com título opcional). Todos os membros recebem o aviso "Sessão ao vivo — Entrar na mesa", mesmo que estejam em outra página. O painel de campanhas mostra o selo "ao vivo".
+- Durante a sessão, o mestre escolhe **qual mapa todos veem**, e a tela dos jogadores troca sozinha.
+- A crônica mostra só o que aconteceu na sessão atual. O mestre encerra a sessão com um resumo.
+- Na aba **Sessões** fica o histórico: número, título, datas, total de mensagens, resumo (que o mestre pode editar) e a crônica completa de cada sessão.
+
+**Testes:** rules-engine 44, shared 8, banco 38, API 60 e ponta a ponta 26, todos passando, além de lint e typecheck sem erros.
+
+**Como testar:** abra a campanha como mestre, vá em Mesa e clique em Iniciar sessão. Em outro navegador, entre como jogador e veja o aviso. Depois escolha um mapa em "Mapa para todos" e encerre a sessão; o resumo aparece na aba Sessões.
+
+**Ainda não feito:** combate com iniciativa e turnos, rituais e habilidades por NEX (próximos passos de Ordem Paranormal).
+
+
 ## 17/11/2026 — Fase 1: Fundação
 
 ### O que foi implementado e testado

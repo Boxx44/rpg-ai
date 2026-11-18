@@ -8,11 +8,13 @@ import type {
   MapDto,
   MapSummaryDto,
   NpcDto,
+  SessionDto,
+  SessionStartedEvent,
   TokenDto,
 } from '@rpg-ai/shared';
 import { canManageCampaign } from '@rpg-ai/shared';
 import { Alert, Badge, Button, cn, Select } from '@rpg-ai/ui';
-import { Minus, Plus, Wifi, WifiOff } from 'lucide-react';
+import { Map as MapIcon, Minus, Plus, Wifi, WifiOff } from 'lucide-react';
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import { api, json } from '@/lib/api';
@@ -20,6 +22,7 @@ import { useCampaignRealtime } from '@/lib/realtime';
 import { accessToken } from '@/lib/supabase';
 import { ChatPanel } from './chat-panel';
 import { MapCanvas } from './map-canvas';
+import { SessionBar } from './session-bar';
 import { QuickSheetPanel, RulesPanel } from './table-panels';
 
 export function GameTable({
@@ -31,6 +34,7 @@ export function GameTable({
   initialNpcs,
   initialCharacters,
   system,
+  initialLive,
 }: {
   campaignId: string;
   myId: string;
@@ -40,7 +44,9 @@ export function GameTable({
   initialNpcs: NpcDto[];
   initialCharacters: CharacterDto[];
   system: CampaignSystemDto | null;
+  initialLive: SessionDto | null;
 }) {
+  const [live, setLive] = useState<SessionDto | null>(initialLive);
   const [tab, setTab] = useState<'chat' | 'sheet' | 'rules'>('chat');
   const [characters, setCharacters] = useState(initialCharacters);
   const manager = canManageCampaign(myRole);
@@ -48,8 +54,10 @@ export function GameTable({
   const [maps, setMaps] = useState(initialMaps);
   const [npcs, setNpcs] = useState(initialNpcs);
   const [mapId, setMapId] = useState<string | null>(
-    initialMaps.find((m) => m.shared)?.id ?? initialMaps[0]?.id ?? null,
+    initialLive?.activeMapId ?? initialMaps.find((m) => m.shared)?.id ?? initialMaps[0]?.id ?? null,
   );
+  /** Durante a sessão ao vivo, o mestre escolhe o mapa que todos veem. */
+  const followsScene = !manager && !!live?.activeMapId;
   const [map, setMap] = useState<MapDto | null>(null);
   const [zoom, setZoom] = useState(1);
   const [error, setError] = useState<string>();
@@ -117,6 +125,19 @@ export function GameTable({
         if (p.mapId === mapId) void loadMap(mapId);
       },
       'npcs.changed': () => void loadNpcs(),
+      'session.started': (e: SessionStartedEvent) => {
+        if (e.campaignId !== campaignId) return;
+        setLive(e.session);
+        setMessages([]);
+      },
+      'session.ended': () => setLive(null),
+      'scene.changed': (p: { sessionId: string; mapId: string | null }) => {
+        setLive((l) => (l && l.id === p.sessionId ? { ...l, activeMapId: p.mapId } : l));
+        if (p.mapId) {
+          void loadMaps();
+          setMapId(p.mapId);
+        }
+      },
       'characters.changed': () =>
         void accessToken()
           .then((t) => api<CharacterDto[]>(`/campaigns/${campaignId}/characters`, t))
@@ -148,8 +169,28 @@ export function GameTable({
   return (
     <div className="grid gap-5 xl:grid-cols-[1fr_400px]">
       <section className="min-w-0 space-y-3" aria-label="Mapa">
+        <SessionBar
+          campaignId={campaignId}
+          manager={manager}
+          live={live}
+          maps={maps}
+          onStarted={(sess) => {
+            setLive(sess);
+            setMessages([]);
+          }}
+          onEnded={() => setLive(null)}
+          onScene={(id) => {
+            setLive((l) => (l ? { ...l, activeMapId: id } : l));
+            if (id) setMapId(id);
+          }}
+        />
         <div className="flex flex-wrap items-center gap-2">
-          {visibleMaps.length > 0 ? (
+          {followsScene ? (
+            <span className="inline-flex items-center gap-2 text-sm text-ink-muted" data-testid="scene-name">
+              <MapIcon className="size-4 text-gold" /> {map?.name ?? 'Carregando mapa…'}
+              <span className="text-xs text-ink-faint">· escolhido pelo mestre</span>
+            </span>
+          ) : visibleMaps.length > 0 ? (
             <Select
               value={mapId ?? ''}
               onChange={(e) => setMapId(e.target.value)}
@@ -175,7 +216,7 @@ export function GameTable({
               data-status={status}
             >
               {status === 'online' ? <Wifi className="size-3.5" /> : <WifiOff className="size-3.5" />}
-              {status === 'online' ? 'Ao vivo' : status === 'connecting' ? 'Conectando…' : 'Desconectado'}
+              {status === 'online' ? 'Conectado' : status === 'connecting' ? 'Conectando…' : 'Desconectado'}
             </span>
             <Button
               variant="ghost"
@@ -252,7 +293,7 @@ export function GameTable({
         <div className={cn('min-h-0 flex-1', tab !== 'chat' && 'hidden')}>
           <ChatPanel
             campaignId={campaignId}
-            messages={messages}
+            messages={live ? messages.filter((m) => m.sessionId === live.id) : messages}
             myId={myId}
             canPlay={myRole !== 'spectator'}
             isManager={manager}
