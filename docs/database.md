@@ -193,6 +193,25 @@ O restante (regras extraídas, sessões, combate, memória, IA) entra nas fases 
 - O mestre pode atualizar `icon`, `state` e `rotation` (`GRANT UPDATE` por coluna).
 - `app_private.toggle_prop(token)`: alterna o estado de um objeto, respeitando quem pode usar.
 
+## Imagens (migration `0010_images.sql`)
+
+- `assets`: imagens da campanha.
+  - **Colunas:** tipo `map`/`token`/`portrait`, `mime`, largura, altura, `bytes` e o conteúdo em `data bytea`.
+  - **Regras de acesso (RLS):**
+    - ler: quem enviou, ou `can_view_asset`;
+    - enviar: o mestre envia qualquer tipo; o jogador, só retrato. Vale o limite de 60 MB por campanha;
+    - apagar: quem enviou ou o mestre.
+- Novas colunas:
+  - `maps.background_asset` e `maps.grid_visible`;
+  - `map_tokens.image_asset`;
+  - `characters.portrait_asset`;
+  - `npcs.portrait_asset`.
+  - Todas usam `ON DELETE SET NULL`: apagar a imagem só a tira de onde estava.
+- Funções:
+  - `app_private.asset_usage(campanha)`: espaço usado;
+  - `app_private.can_view_asset(imagem)`: quem pode ver.
+- O gatilho `app_private.check_asset_ref(coluna)` exige que a imagem seja da mesma campanha e de quem a usa (o mestre pode usar qualquer uma).
+
 ## Backups
 
 Supabase Pro: backups diários (ponto no tempo opcional, pago à parte). Além disso: dump lógico semanal para armazenamento externo e teste de restauração trimestral (Fase 9).

@@ -95,9 +95,11 @@ test('mestre monta mapa com porta, tocha e baú', async ({ browser }) => {
 
   // Água se mexendo numa faixa embaixo
   await gmPage.getByRole('button', { name: 'Água' }).click();
-  await gmPage.mouse.move(box.x + 20, box.y + 300);
+  await canvas.scrollIntoViewIfNeeded();
+  const wbox = (await canvas.boundingBox())!;
+  await gmPage.mouse.move(wbox.x + 20, wbox.y + 300);
   await gmPage.mouse.down();
-  await gmPage.mouse.move(box.x + 460, box.y + 300, { steps: 24 });
+  await gmPage.mouse.move(wbox.x + 460, wbox.y + 300, { steps: 24 });
   await gmPage.mouse.up();
   await expect(gmPage.locator('[data-terrain="water"]')).toHaveCount(12);
 
@@ -106,7 +108,8 @@ test('mestre monta mapa com porta, tocha e baú', async ({ browser }) => {
   await expect(palette).toBeVisible();
   const placeAt = async (prop: string, px: number, py: number) => {
     await palette.getByRole('button', { name: prop, exact: true }).click();
-    await canvas.scrollIntoViewIfNeeded();
+    // centraliza o mapa na tela (o cabeçalho fixo não pode ficar por cima)
+    await canvas.evaluate((el) => el.scrollIntoView({ block: 'center' }));
     const b = (await canvas.boundingBox())!;
     await gmPage.mouse.click(b.x + px, b.y + py);
   };

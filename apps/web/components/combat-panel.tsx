@@ -58,7 +58,12 @@ export function CombatBanner({
   const canPass = !!combat.currentId && (manager || cur?.mine);
   return (
     <div
-      className="flex flex-wrap items-center gap-3 rounded-xl border border-gold/30 bg-surface/80 px-4 py-2.5"
+      className={cn(
+        'flex flex-wrap items-center gap-3 rounded-xl border px-4 py-2.5 transition-colors',
+        cur?.mine && !manager
+          ? 'border-gold bg-gold/10 shadow-[0_0_24px_rgba(230,200,127,0.25)]'
+          : 'border-gold/30 bg-surface/80',
+      )}
       data-testid="combat-banner"
     >
       <Swords className="size-4 text-gold" />

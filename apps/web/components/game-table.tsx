@@ -22,6 +22,7 @@ import { api, json } from '@/lib/api';
 import { useCampaignRealtime } from '@/lib/realtime';
 import { accessToken } from '@/lib/supabase';
 import { ChatPanel } from './chat-panel';
+import { CombatIntro, InitiativeBar, useCombatImages } from './combat-stage';
 import { DiceTray, rollOutcome } from './dice-tray';
 import { MapCanvas, type TokenDecoration } from './map-canvas';
 import { playSound, toast } from '@/lib/feedback';
@@ -162,7 +163,10 @@ export function GameTable({
         void loadMaps();
         if (p.mapId === mapId) void loadMap(mapId);
       },
-      'npcs.changed': () => void loadNpcs(),
+      'npcs.changed': () => {
+        void loadNpcs();
+        void loadMap(mapId); // retrato do NPC pode ter mudado no token
+      },
       'prop.toggled': (p: {
         mapId: string;
         tokenId: string;
@@ -196,10 +200,13 @@ export function GameTable({
           setMapId(p.mapId);
         }
       },
-      'characters.changed': () =>
+      'characters.changed': () => {
         void accessToken()
           .then((t) => api<CharacterDto[]>(`/campaigns/${campaignId}/characters`, t))
-          .then(setCharacters),
+          .then(setCharacters);
+        void loadMap(mapId); // retrato novo aparece no token
+        if (combat) void loadCombat();
+      },
     },
     resync,
   );
@@ -298,6 +305,52 @@ export function GameTable({
     }
     return out;
   }, [shownCombat, shownMap]);
+
+  // Imagens dos combatentes (retrato ou imagem do token de mesmo nome).
+  const tokenImages = useMemo(() => {
+    const out: Record<string, string | null> = {};
+    for (const t of shownMap?.tokens ?? []) if (t.image && !(t.label in out)) out[t.label] = t.image;
+    return out;
+  }, [shownMap]);
+  const combatImages = useCombatImages(campaignId, shownCombat, tokenImages);
+  const [banner, setBanner] = useState<EncounterDto | null>(null);
+  const closeBanner = useCallback(() => setBanner(null), []);
+  const [focusToken, setFocusToken] = useState<string | null>(null);
+
+  // Entrada em combate: faixa "Combate!", som e a aba Combate abre sozinha.
+  // Depois disso, avisa quem entrou e quando o combate termina.
+  const prevCombat = useRef<{ id: string | null; ids: Set<string> }>({
+    id: shownCombat?.id ?? null,
+    ids: new Set(shownCombat?.combatants.map((c) => c.id) ?? []),
+  });
+  useEffect(() => {
+    const prev = prevCombat.current;
+    const cur = shownCombat;
+    prevCombat.current = { id: cur?.id ?? null, ids: new Set(cur?.combatants.map((c) => c.id) ?? []) };
+    if (cur && cur.id !== prev.id) {
+      setBanner(cur);
+      setTab('combat');
+      playSound('combat');
+      return;
+    }
+    if (!cur && prev.id) {
+      toast('Combate encerrado', { tone: 'success' });
+      setFocusToken(null);
+      return;
+    }
+    if (cur) {
+      const joined = cur.combatants.filter((c) => !prev.ids.has(c.id));
+      if (joined.length) {
+        playSound('hit');
+        toast(
+          joined.length === 1
+            ? `${joined[0]!.name} entrou no combate`
+            : `${joined.length} entraram no combate`,
+          { body: joined.length > 1 ? joined.map((c) => c.name).join(', ') : undefined, tone: 'danger' },
+        );
+      }
+    }
+  }, [shownCombat]);
 
   // Aviso "É a sua vez!" quando o turno chega num combatente seu.
   const lastTurn = useRef(shownCombat?.currentId ?? null);
@@ -411,6 +464,24 @@ export function GameTable({
             </Button>
           </div>
         </div>
+        {shownCombat && (
+          <InitiativeBar
+            combat={shownCombat}
+            images={combatImages}
+            onPick={(c) => {
+              const tk = shownMap?.tokens.find((t) =>
+                c.characterId
+                  ? t.characterId === c.characterId
+                  : c.npcId
+                    ? t.npcId === c.npcId
+                    : t.label === c.name,
+              );
+              setFocusToken(tk?.id ?? null);
+              setTab('combat');
+            }}
+          />
+        )}
+        {banner && <CombatIntro combat={banner} images={combatImages} onDone={closeBanner} />}
         {shownMap ? (
           <div className="relative">
             <DiceTray message={diceMsg} onDone={closeDice} />
@@ -421,6 +492,8 @@ export function GameTable({
               onMove={onMove}
               onUseProp={myRole === 'spectator' ? undefined : onUseProp}
               decorations={decorations}
+              selectedTokenId={focusToken}
+              onSelectToken={(t) => setFocusToken(t.id)}
               className="max-h-[70vh]"
             />
           </div>

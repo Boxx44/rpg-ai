@@ -9,6 +9,36 @@
 
 ---
 
+## 18/11/2026 — Imagens, modelos de mapa e entrada em combate
+
+**O que funciona (testado):**
+
+- **Fundo de mapa por imagem:** o mestre envia um mapa desenhado ou uma foto (PNG, JPG ou WebP). A grade fica por cima e pode ser escondida. O botão "Ajustar grade à imagem" calcula as linhas para a imagem não ficar esticada.
+- **Modelos de mapa prontos:** ao criar um mapa, dá para escolher Casa abandonada, Floresta à noite, Rua da cidade, Cemitério ou Base da Ordem. Cada um já vem com piso, paredes, portas e objetos, e tudo pode ser editado.
+- **Imagem nos tokens:**
+  - o mestre põe uma imagem em qualquer token;
+  - o jogador põe um **retrato** no próprio personagem, que aparece no token e no combate;
+  - NPCs também têm retrato, que os jogadores só veem depois de o NPC ser revelado.
+- **Imagens já enviadas** podem ser reaproveitadas ou apagadas. O site reduz o tamanho da imagem antes de enviar e remove dados escondidos da foto, como a localização GPS.
+- **Entrada em combate:**
+  - aparece para todos uma faixa "Combate!" com som e a ordem de iniciativa, e a aba Combate abre sozinha;
+  - acima do mapa fica uma **barra de iniciativa** com retratos, rodada, vida e quem é o próximo;
+  - clicar num combatente leva o mapa até a peça dele, e o mapa acompanha sozinho a peça da vez;
+  - aparecem avisos de "X entrou no combate" e "Combate encerrado";
+  - quando é a sua vez, o aviso de combate fica dourado.
+- **Ajustes:** a porta aberta ficou mais bonita, e o estado concorda com o objeto ("porta aberta", "baú aberto", "computador ligado").
+
+**Segurança das imagens:**
+
+- O servidor confere o conteúdo real do arquivo. SVG e arquivos disfarçados são recusados.
+- Quem pode ver cada imagem é decidido no banco de dados:
+  - fundo de mapa oculto ou token oculto não aparece para jogadores;
+  - um jogador não consegue usar uma imagem secreta do mestre.
+
+**Limite:** 4 MB por imagem e 60 MB por campanha. As imagens ficam no banco de dados do Supabase (o plano gratuito tem 500 MB no total).
+
+**Testes:** rules-engine 57, shared 15, banco 52, API 85 e ponta a ponta 44, todos passando, além de lint e typecheck sem erros.
+
 ## 18/11/2026 — Mesa viva, objetos no mapa e acessibilidade
 
 **O que funciona (testado):**

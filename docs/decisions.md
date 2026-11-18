@@ -230,3 +230,27 @@ _Regras completadas_
 - As animações usam classes CSS e respeitam "menos movimento", tanto pela preferência do sistema quanto pela do site.
 - Os sons são sintetizados com WebAudio, sem baixar arquivos.
 - A bandeja de dados é só visual: o resultado mostrado é sempre o que o servidor rolou.
+
+**ADR-036 — Imagens guardadas no banco de dados (migration 0010).**
+
+- **Opções:**
+  - (a) disco do servidor: o Render gratuito apaga o disco ao reiniciar;
+  - (b) Supabase Storage: exige chave de serviço e configuração extra;
+  - (c) coluna `bytea` no Postgres.
+- **Escolhida: (c).** Não exige nenhuma configuração nova, não some e fica protegida pelas mesmas regras de acesso (RLS) do resto do jogo.
+- **Custo:** ocupa espaço do banco. Por isso as imagens são reduzidas no navegador (WebP; fundo até 4096 px, token e retrato até 512 px) e há limite de 4 MB por arquivo e 60 MB por campanha.
+- Se o espaço apertar no futuro, as imagens podem migrar para o Storage sem mudar a interface, porque o acesso já passa por `/assets/:id/file`.
+- **Quem vê:** a função `app_private.can_view_asset` libera a imagem para o mestre, para quem enviou e para membros que já podem ver onde ela está em uso (mapa compartilhado, token visível, retrato de personagem, NPC revelado).
+- O gatilho `check_asset_ref` impede usar imagem de outra campanha ou enviada por outra pessoa, a menos que quem usa seja o mestre.
+- **Formato:** o tipo é conferido pelos bytes (`imageInfo` em `packages/shared`): só PNG, JPEG e WebP. SVG é sempre recusado, porque pode conter código. As imagens são servidas com `nosniff` e `sandbox`.
+
+**ADR-037 — Modelos de mapa gerados por código.**
+
+- Os 5 modelos (`packages/shared/src/map-templates.ts`) são montados por código, com um gerador fixo: o mesmo modelo sai sempre igual.
+- Não usam imagens de terceiros, e cada modelo vira um mapa comum, editável.
+
+**ADR-038 — Entrada em combate.**
+
+- A faixa "Combate!" é só visual: não bloqueia cliques, some sozinha ou com Esc e respeita "menos movimento".
+- A barra de iniciativa usa os dados que o servidor já filtrou, então combatentes ocultos não aparecem para jogadores.
+- Inimigos sem retrato usam a imagem do token de mesmo nome que está no mapa.

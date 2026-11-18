@@ -270,6 +270,19 @@ Existem hoje: `apps/web`, `apps/api`, `packages/{db,shared,ui,logger,rules-engin
   - `lib/feedback.ts` concentra as preferências, os sons e os avisos (`toast`).
   - `PrefsMenu` (botão "Aa") e `Toaster` ficam no layout.
 
+**Imagens:**
+
+- Rotas `campaigns/:id/assets`: `POST` (envio multipart, até 4 MB, guardado em memória), `GET` (lista sem o conteúdo), `GET usage`, `GET :assetId/file` (o conteúdo) e `DELETE`.
+- No site:
+  - `lib/assets.ts` reduz a imagem no navegador com canvas, converte para WebP e envia;
+  - para mostrar, busca a imagem com o login da pessoa e cria um endereço `blob:` guardado em memória;
+  - `ImagePicker` é o componente de escolher, enviar, arrastar ou reaproveitar.
+- `MapDto` traz `backgroundAsset` e `gridVisible`. `TokenDto.image` é a imagem do token ou, se não houver, o retrato do personagem/NPC. `CombatantDto.image` é o retrato.
+- `POST maps` aceita `template`, que cria o terreno e os objetos do modelo.
+- Combate no site:
+  - `combat-stage.tsx` traz `CombatIntro`, a faixa de abertura, e `InitiativeBar`, a barra acima do mapa;
+  - `GameTable` compara o combate anterior com o novo para saber se o combate começou, se alguém entrou ou se terminou.
+
 **Fluxo de autenticação implementado:** o navegador faz login no Supabase Auth → recebe um token (JWT) → envia o token à API → a API verifica a assinatura (segredo HS256 ou chaves públicas JWKS) → confirma que a conta existe e está ativa → executa a consulta no banco com o papel do usuário (RLS ativo).
 
 ## 8. Dependências externas
