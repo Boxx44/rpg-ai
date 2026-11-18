@@ -150,14 +150,14 @@ test('rolagens e chat em tempo real, com segredo do mestre', async () => {
   await plPage.getByTestId('chat-input').fill('2d6+3');
   await plPage.getByLabel('Rótulo da rolagem').fill('Dano da adaga');
   await plPage.keyboard.press('Enter');
-  await expect(gmPage.getByText('Dano da adaga')).toBeVisible();
+  await expect(gmPage.getByTestId('chat-list').getByText('Dano da adaga')).toBeVisible();
 
   // Rolagem secreta do mestre
   await gmPage.getByLabel('Quem vê').selectOption('gm');
   await gmPage.getByLabel('Rótulo da rolagem').fill('Emboscada');
   await gmPage.getByTestId('chat-input').fill('1d20+4');
   await gmPage.getByRole('button', { name: 'Rolar' }).click();
-  await expect(gmPage.getByText('Emboscada')).toBeVisible();
+  await expect(gmPage.getByTestId('chat-list').getByText('Emboscada')).toBeVisible();
 
   // Mestre fala como NPC
   await gmPage.getByLabel('Quem vê').selectOption('public');

@@ -31,6 +31,16 @@
 
   --animate-rise: rise 0.5s cubic-bezier(0.2, 0.7, 0.2, 1) both;
   --animate-glow: glow 6s ease-in-out infinite;
+  --animate-flicker: flicker 0.9s ease-in-out infinite;
+  --animate-pulse-soft: pulse-soft 2.4s ease-in-out infinite;
+  --animate-spin-slow: spin-slow 14s linear infinite;
+  --animate-drift: drift 3.5s linear infinite;
+  --animate-float-up: float-up 1.4s ease-out forwards;
+  --animate-shake: shake 0.45s ease-in-out;
+  --animate-ring-pulse: ring-pulse 1.6s ease-out infinite;
+  --animate-dice: dice-tumble 0.7s cubic-bezier(0.2, 0.8, 0.3, 1.2) both;
+  --animate-pop: pop 0.35s ease-out both;
+  --animate-slide-in: slide-in 0.3s ease-out both;
 
   @keyframes rise {
     from {
@@ -40,6 +50,129 @@
     to {
       opacity: 1;
       transform: translateY(0);
+    }
+  }
+  @keyframes flicker {
+    0%,
+    100% {
+      transform: scale(1, 1);
+      opacity: 1;
+    }
+    25% {
+      transform: scale(0.94, 1.08);
+      opacity: 0.9;
+    }
+    50% {
+      transform: scale(1.05, 0.95);
+      opacity: 1;
+    }
+    75% {
+      transform: scale(0.97, 1.04);
+      opacity: 0.85;
+    }
+  }
+  @keyframes pulse-soft {
+    0%,
+    100% {
+      opacity: 0.55;
+    }
+    50% {
+      opacity: 1;
+    }
+  }
+  @keyframes spin-slow {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+  @keyframes drift {
+    from {
+      transform: translateX(0);
+    }
+    to {
+      transform: translateX(40px);
+    }
+  }
+  @keyframes float-up {
+    0% {
+      opacity: 0;
+      transform: translateY(0) scale(0.8);
+    }
+    15% {
+      opacity: 1;
+      transform: translateY(-6px) scale(1.1);
+    }
+    100% {
+      opacity: 0;
+      transform: translateY(-40px) scale(1);
+    }
+  }
+  @keyframes shake {
+    0%,
+    100% {
+      transform: translateX(0);
+    }
+    20% {
+      transform: translateX(-4px);
+    }
+    40% {
+      transform: translateX(4px);
+    }
+    60% {
+      transform: translateX(-3px);
+    }
+    80% {
+      transform: translateX(2px);
+    }
+  }
+  @keyframes ring-pulse {
+    0% {
+      opacity: 0.9;
+      transform: scale(0.85);
+    }
+    100% {
+      opacity: 0;
+      transform: scale(1.35);
+    }
+  }
+  @keyframes dice-tumble {
+    0% {
+      transform: translateY(-30px) rotate(-200deg) scale(0.6);
+      opacity: 0;
+    }
+    60% {
+      transform: translateY(4px) rotate(20deg) scale(1.05);
+      opacity: 1;
+    }
+    80% {
+      transform: translateY(-2px) rotate(-6deg) scale(1);
+    }
+    100% {
+      transform: translateY(0) rotate(0) scale(1);
+      opacity: 1;
+    }
+  }
+  @keyframes pop {
+    0% {
+      transform: scale(0.6);
+      opacity: 0;
+    }
+    70% {
+      transform: scale(1.08);
+      opacity: 1;
+    }
+    100% {
+      transform: scale(1);
+    }
+  }
+  @keyframes slide-in {
+    from {
+      opacity: 0;
+      transform: translateX(16px);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(0);
     }
   }
   @keyframes glow {
@@ -72,15 +205,110 @@
     background: rgba(124, 79, 240, 0.45);
     color: white;
   }
+  /* Foco sempre visível para quem usa teclado. */
   :focus-visible {
-    outline-color: var(--color-gold);
+    outline: 2px solid var(--color-gold-bright);
+    outline-offset: 2px;
+    border-radius: 6px;
   }
   @media (prefers-reduced-motion: reduce) {
     *,
     *::before,
     *::after {
       animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
       transition-duration: 0.01ms !important;
     }
   }
+}
+
+/* ═════════ Preferências de acessibilidade (atributos no <html>) ═════════ */
+
+/* Tamanho do texto: tudo em rem cresce junto. */
+html[data-text='lg'] {
+  font-size: 112.5%;
+}
+html[data-text='xl'] {
+  font-size: 125%;
+}
+
+/* Menos movimento, escolhido pela pessoa (além da opção do sistema). */
+html[data-motion='reduce'] *,
+html[data-motion='reduce'] *::before,
+html[data-motion='reduce'] *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+}
+
+/* Modo claro. */
+html[data-theme='light'] {
+  color-scheme: light;
+  --color-bg: #f5f2fa;
+  --color-surface: #ffffff;
+  --color-surface-2: #f0ebf7;
+  --color-surface-3: #e5def0;
+  --color-line: #d3c9e2;
+  --color-ink: #1b1625;
+  --color-ink-muted: #4a4359;
+  --color-ink-faint: #6a6280;
+  --color-arcane-100: #2a1460;
+  --color-arcane-200: #3a1d85;
+  --color-arcane-300: #5428c4;
+  --color-arcane-700: #e4daff;
+  --color-arcane-900: #efe9ff;
+  --color-gold: #8a6416;
+  --color-gold-bright: #6f4f0c;
+  --color-blood-light: #a51d29;
+  --color-sky-100: #0b3d5c;
+  --color-sky-200: #0c4a6e;
+  --color-sky-300: #075985;
+  --color-emerald-300: #047857;
+  --color-amber-300: #92400e;
+  --color-amber-200: #92400e;
+  --color-rose-200: #9f1239;
+  --color-violet-200: #5b21b6;
+  --color-zinc-200: #3f3f46;
+}
+html[data-theme='light'] body {
+  background-image: none;
+}
+
+/* Alto contraste: textos mais fortes, bordas e foco bem marcados. */
+html[data-contrast='high'] {
+  --color-ink: #ffffff;
+  --color-ink-muted: #e4def0;
+  --color-ink-faint: #c9c1d8;
+  --color-line: #8d82a6;
+  --color-gold: #ffd76a;
+  --color-gold-bright: #ffe39a;
+  --color-arcane-300: #d5c2ff;
+}
+html[data-contrast='high'][data-theme='light'] {
+  --color-ink: #000000;
+  --color-ink-muted: #1f1a29;
+  --color-ink-faint: #362f45;
+  --color-line: #5d5373;
+  --color-gold: #5c3f00;
+  --color-gold-bright: #4a3200;
+  --color-arcane-300: #3b0fa8;
+}
+html[data-contrast='high'] :focus-visible {
+  outline-width: 3px;
+}
+
+/* Link "pular para o conteúdo" (aparece só ao usar Tab). */
+.skip-link {
+  position: absolute;
+  left: 1rem;
+  top: -4rem;
+  z-index: 100;
+  border-radius: 0.5rem;
+  background: var(--color-gold-bright);
+  color: #000;
+  padding: 0.5rem 1rem;
+  font-weight: 600;
+}
+.skip-link:focus {
+  top: 1rem;
 }

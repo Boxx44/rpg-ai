@@ -14,6 +14,7 @@ import Link from 'next/link';
 import { Fragment, useEffect, useState } from 'react';
 import { api, json } from '@/lib/api';
 import { accessToken } from '@/lib/supabase';
+import { playSound, toast } from '@/lib/feedback';
 import { QuickReference } from './system-panels';
 import { GearSection, RitualsSection } from './system-extras';
 import { normalizeValues, safeCompute } from './system-sheet';
@@ -292,6 +293,12 @@ export function QuickSheetPanel({
       );
       setNotes([...(r.critical ? ['Acerto crítico! O dano já foi multiplicado.'] : []), ...r.notes]);
       if (r.character) onUpdated(r.character);
+      if (r.critical) {
+        playSound('crit');
+        toast('Acerto crítico!', { body: 'O dano já foi multiplicado.', tone: 'gold' });
+      } else if (path === 'attack') playSound('hit');
+      else if (path === 'cast') toast('Ritual conjurado', { body: r.notes[0], tone: 'arcane' });
+      else toast('Descanso registrado', { tone: 'success' });
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Erro');
     } finally {
@@ -315,6 +322,7 @@ export function QuickSheetPanel({
         },
       );
       onUpdated(updated);
+      toast('Ficha salva', { tone: 'success', ms: 1800 });
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Erro');
     } finally {

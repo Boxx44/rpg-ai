@@ -3,7 +3,7 @@ import { ArcaneBackdrop, Logo } from '@/components/brand';
 
 export default function AuthLayout({ children }: { children: React.ReactNode }) {
   return (
-    <main className="grid min-h-dvh lg:grid-cols-[1.1fr_1fr]">
+    <main id="main" className="grid min-h-dvh lg:grid-cols-[1.1fr_1fr]">
       <section className="relative hidden flex-col justify-between overflow-hidden border-r border-line/60 p-12 lg:flex">
         <ArcaneBackdrop />
         <Logo className="relative" />

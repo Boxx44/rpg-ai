@@ -25,11 +25,23 @@ export function Sigil({ size = 32, className }: { size?: number; className?: str
   );
 }
 
-export function Logo({ href = '/', className }: { href?: string; className?: string }) {
+export function Logo({
+  href = '/',
+  className,
+  compact,
+}: {
+  href?: string;
+  className?: string;
+  compact?: boolean;
+}) {
   return (
-    <Link href={href} className={cn('group inline-flex items-center gap-2.5', className)}>
+    <Link
+      href={href}
+      aria-label="RPG AI — início"
+      className={cn('group inline-flex items-center gap-2.5', className)}
+    >
       <Sigil size={30} className="transition-transform duration-500 group-hover:rotate-[30deg]" />
-      <span className="font-display text-lg tracking-[0.18em] text-ink">
+      <span className={cn('font-display text-lg tracking-[0.18em] text-ink', compact && 'hidden md:inline')}>
         RPG <span className="text-gold-bright">AI</span>
       </span>
     </Link>

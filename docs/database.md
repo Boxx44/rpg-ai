@@ -185,6 +185,14 @@ O restante (regras extraídas, sessões, combate, memória, IA) entra nas fases 
 - `npc_gm_details.sheet`: ficha completa do NPC (só o mestre lê e grava).
 - `campaigns.sandbox` + índice único por criador: no máximo uma mesa de treino por pessoa. A marcação é feita pela função `app_private.mark_sandbox`.
 
+## Objetos do mapa (migration `0009_map_props.sql`)
+
+- `map_tokens.icon`: tipo do desenho (porta, tocha, baú…).
+- `map_tokens.state`: estado (`open`/`closed`/`on`/`off`) ou vazio, se o objeto não muda.
+- `map_tokens.rotation`: 0, 90, 180 ou 270 graus.
+- O mestre pode atualizar `icon`, `state` e `rotation` (`GRANT UPDATE` por coluna).
+- `app_private.toggle_prop(token)`: alterna o estado de um objeto, respeitando quem pode usar.
+
 ## Backups
 
 Supabase Pro: backups diários (ponto no tempo opcional, pago à parte). Além disso: dump lógico semanal para armazenamento externo e teste de restauração trimestral (Fase 9).

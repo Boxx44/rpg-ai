@@ -256,9 +256,19 @@ Existem hoje: `apps/web`, `apps/api`, `packages/{db,shared,ui,logger,rules-engin
 **Ações de ficha compartilhadas:** `SheetActions` (api/modules/sheet-actions.ts) atende personagens (`characters/:id/attack|cast|rest`) e NPCs (`npcs/:id/attack|cast|rest`, só o mestre). Cada um fornece um "carregador" que traz a ficha validada e sabe gravar recursos e perdas permanentes.
 
 **Biblioteca e treino:**
+
 - Biblioteca: `GET/POST/PATCH/DELETE /library`, `POST /library/:id/use` (copiar para a campanha) e `POST /campaigns/:id/library` (guardar cópia).
 - Treino: `POST /sandbox` (abre ou cria) e `DELETE /sandbox` (recomeçar).
 - No site: páginas `/library` (biblioteca e criação guiada) e `/practice`, e o botão "Ver como jogador" na mesa.
+
+**Objetos e mesa viva:**
+
+- `POST maps/:mapId/tokens/:tokenId/toggle` usa um objeto. A API emite `prop.toggled`: para a campanha toda, se o objeto for visível num mapa compartilhado; senão, só para os mestres.
+- No site:
+  - `MapCanvas` desenha o terreno com textura, as luzes e os objetos (`map-props.tsx`). As peças recebem enfeites vindos do combate: vida, vez do turno e condições.
+  - `DiceTray` anima as rolagens que chegam.
+  - `lib/feedback.ts` concentra as preferências, os sons e os avisos (`toast`).
+  - `PrefsMenu` (botão "Aa") e `Toaster` ficam no layout.
 
 **Fluxo de autenticação implementado:** o navegador faz login no Supabase Auth → recebe um token (JWT) → envia o token à API → a API verifica a assinatura (segredo HS256 ou chaves públicas JWKS) → confirma que a conta existe e está ativa → executa a consulta no banco com o papel do usuário (RLS ativo).
 

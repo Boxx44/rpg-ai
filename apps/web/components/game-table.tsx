@@ -17,12 +17,14 @@ import { canManageCampaign } from '@rpg-ai/shared';
 import { Alert, Badge, Button, cn, Select } from '@rpg-ai/ui';
 import { Eye, Map as MapIcon, Minus, Plus, Wifi, WifiOff } from 'lucide-react';
 import Link from 'next/link';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { api, json } from '@/lib/api';
 import { useCampaignRealtime } from '@/lib/realtime';
 import { accessToken } from '@/lib/supabase';
 import { ChatPanel } from './chat-panel';
-import { MapCanvas } from './map-canvas';
+import { DiceTray, rollOutcome } from './dice-tray';
+import { MapCanvas, type TokenDecoration } from './map-canvas';
+import { playSound, toast } from '@/lib/feedback';
 import { CombatBanner, CombatPanel } from './combat-panel';
 import { SessionBar } from './session-bar';
 import { QuickSheetPanel, RulesPanel } from './table-panels';
@@ -79,7 +81,18 @@ export function GameTable({
   const [zoom, setZoom] = useState(1);
   const [error, setError] = useState<string>();
 
+  /** Rolagem em destaque na bandeja de dados (só as que chegam agora, não o histórico). */
+  const [diceMsg, setDiceMsg] = useState<ChatMessageDto | null>(null);
+  const lastRolled = useRef(initialMessages.at(-1)?.id ?? 0);
+  const closeDice = useCallback(() => setDiceMsg(null), []);
   const addMessage = useCallback((m: ChatMessageDto) => {
+    if (m.kind === 'roll' && m.roll && m.id > lastRolled.current) {
+      lastRolled.current = m.id;
+      setDiceMsg(m);
+      playSound('dice');
+      const out = rollOutcome(m.roll);
+      if (out) setTimeout(() => playSound(out === 'crit' ? 'crit' : 'fail'), 750);
+    } else if (m.id > lastRolled.current) lastRolled.current = m.id;
     setMessages((prev) =>
       prev.some((x) => x.id === m.id) ? prev : [...prev, m].sort((a, b) => a.id - b.id).slice(-300),
     );
@@ -150,10 +163,29 @@ export function GameTable({
         if (p.mapId === mapId) void loadMap(mapId);
       },
       'npcs.changed': () => void loadNpcs(),
+      'prop.toggled': (p: {
+        mapId: string;
+        tokenId: string;
+        state: TokenDto['state'];
+        label: string;
+        by: string;
+      }) => {
+        setMap((cur) =>
+          cur && cur.id === p.mapId
+            ? { ...cur, tokens: cur.tokens.map((t) => (t.id === p.tokenId ? { ...t, state: p.state } : t)) }
+            : cur,
+        );
+        if (p.by !== myId) playSound(p.state === 'on' || p.state === 'off' ? 'fire' : 'door');
+      },
       'session.started': (e: SessionStartedEvent) => {
         if (e.campaignId !== campaignId) return;
         setLive(e.session);
         setMessages([]);
+        playSound('notify');
+        toast('A sessão começou!', {
+          body: `Sessão ${e.session.number}${e.session.title ? ` — ${e.session.title}` : ''}`,
+          tone: 'arcane',
+        });
       },
       'session.ended': () => setLive(null),
       'combat.changed': () => void loadCombat(),
@@ -174,6 +206,27 @@ export function GameTable({
 
   const canMove = (t: TokenDto) =>
     myRole !== 'spectator' && (manager || (t.controlledBy === myId && !t.hidden));
+
+  /** Abrir/fechar porta, acender/apagar tocha… (o servidor decide se pode). */
+  async function onUseProp(t: TokenDto) {
+    if (myRole === 'spectator') return;
+    setError(undefined);
+    const before = t.state;
+    const flip = { open: 'closed', closed: 'open', on: 'off', off: 'on' } as const;
+    const next = before ? flip[before] : null;
+    setMap((cur) =>
+      cur ? { ...cur, tokens: cur.tokens.map((k) => (k.id === t.id ? { ...k, state: next } : k)) } : cur,
+    );
+    playSound(before === 'on' || before === 'off' ? 'fire' : 'door');
+    try {
+      await api(`/campaigns/${campaignId}/maps/${t.mapId}/tokens/${t.id}/toggle`, await accessToken(), {
+        method: 'POST',
+      });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Não foi possível usar o objeto');
+      void loadMap(t.mapId);
+    }
+  }
 
   async function onMove(t: TokenDto, x: number, y: number) {
     setError(undefined);
@@ -223,6 +276,42 @@ export function GameTable({
     (m) => !asPlayer || m.visibility !== 'gm',
   );
   const shownNpcs = asPlayer ? npcs.filter((n) => n.revealed).map(({ details: _d, ...n }) => n) : npcs;
+  /** Vida, vez do turno e condições desenhadas nas peças do mapa. */
+  const decorations = useMemo(() => {
+    const out: Record<string, TokenDecoration> = {};
+    if (!shownCombat || !shownMap) return out;
+    for (const t of shownMap.tokens) {
+      const c = shownCombat.combatants.find((x) =>
+        t.characterId
+          ? x.characterId === t.characterId
+          : t.npcId
+            ? x.npcId === t.npcId
+            : x.kind === 'enemy' && x.name === t.label,
+      );
+      if (!c) continue;
+      out[t.id] = {
+        hp: c.hp ?? undefined,
+        health: c.defeated ? 'down' : c.health,
+        turn: shownCombat.currentId === c.id,
+        conditions: c.conditions.length,
+      };
+    }
+    return out;
+  }, [shownCombat, shownMap]);
+
+  // Aviso "É a sua vez!" quando o turno chega num combatente seu.
+  const lastTurn = useRef(shownCombat?.currentId ?? null);
+  useEffect(() => {
+    const cur = shownCombat?.currentId ?? null;
+    if (cur === lastTurn.current) return;
+    lastTurn.current = cur;
+    const c = shownCombat?.combatants.find((x) => x.id === cur);
+    if (c?.mine && !manager) {
+      playSound('turn');
+      toast('É a sua vez!', { body: `${c.name} age agora.`, tone: 'gold' });
+    } else if (c) playSound('click');
+  }, [shownCombat, manager]);
+
   const shownCharacters = asPlayer ? characters.filter((c) => c.ownerId === myId) : characters;
   return (
     <div className="grid gap-5 xl:grid-cols-[1fr_400px]">
@@ -323,7 +412,18 @@ export function GameTable({
           </div>
         </div>
         {shownMap ? (
-          <MapCanvas map={shownMap} zoom={zoom} canMove={canMove} onMove={onMove} className="max-h-[70vh]" />
+          <div className="relative">
+            <DiceTray message={diceMsg} onDone={closeDice} />
+            <MapCanvas
+              map={shownMap}
+              zoom={zoom}
+              canMove={canMove}
+              onMove={onMove}
+              onUseProp={myRole === 'spectator' ? undefined : onUseProp}
+              decorations={decorations}
+              className="max-h-[70vh]"
+            />
+          </div>
         ) : (
           <div className="flex min-h-[360px] flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-line p-8 text-center">
             <p className="font-display text-lg">Nenhum mapa na mesa</p>
@@ -343,7 +443,10 @@ export function GameTable({
         {map && (
           <p className="text-xs text-ink-faint">
             Cada quadrado = {map.cellLabel}.{' '}
-            {manager ? 'Arraste qualquer token.' : 'Arraste o token do seu personagem.'}
+            {manager
+              ? 'Arraste qualquer token.'
+              : 'Arraste o token do seu personagem (ou use as setas do teclado).'}{' '}
+            Clique em portas, baús e tochas para usar.
           </p>
         )}
       </section>
@@ -366,7 +469,29 @@ export function GameTable({
               type="button"
               role="tab"
               aria-selected={tab === k}
+              tabIndex={tab === k ? 0 : -1}
+              data-tab={k}
               onClick={() => setTab(k)}
+              onKeyDown={(e) => {
+                const order = ['chat', 'combat', 'sheet', 'rules'] as const;
+                const i = order.indexOf(k);
+                const next =
+                  e.key === 'ArrowRight'
+                    ? order[(i + 1) % 4]
+                    : e.key === 'ArrowLeft'
+                      ? order[(i + 3) % 4]
+                      : e.key === 'Home'
+                        ? order[0]
+                        : e.key === 'End'
+                          ? order[3]
+                          : null;
+                if (!next) return;
+                e.preventDefault();
+                setTab(next);
+                (
+                  e.currentTarget.parentElement?.querySelector(`[data-tab="${next}"]`) as HTMLElement | null
+                )?.focus();
+              }}
               className={cn(
                 'flex-1 whitespace-nowrap rounded-md px-2 py-1.5 text-sm transition-colors',
                 tab === k ? 'bg-arcane-700/60 text-ink' : 'text-ink-muted hover:text-ink',

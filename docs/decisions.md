@@ -58,9 +58,10 @@ Formato: cada decisão tem contexto, escolha e motivo. "Pendente" = precisa da s
 
 **ADR-027 — Instalação no Windows por scripts de dois cliques.** `INSTALAR.bat` instala Node.js e Docker Desktop via winget, dependências, compila e prepara o banco; `INICIAR.bat` sobe tudo e abre o navegador. O banco e o Redis rodam no Docker (a extensão pgvector exigida pelas migrations vem pronta na imagem).
 
-**ADR-028 — Preparar x Jogar com sessões ao vivo (migration 0005).** A campanha passa a ter dois espaços: *Preparar* (personagens, NPCs, mapas) e *Jogar* (a mesa). Jogar acontece dentro de uma **sessão** (`sessions`), que só o mestre inicia e encerra, e cada campanha tem no máximo uma ao vivo (índice único parcial). Mensagens e rolagens recebem `session_id` automaticamente por gatilho no banco, para que o cliente não possa forjá-lo. O mestre escolhe o mapa da cena (`set_scene`), que é compartilhado automaticamente, e os jogadores o seguem. O início da sessão é avisado na sala pessoal `u:<id>` de cada membro, de modo que chega mesmo a quem está em outra página. O histórico mostra o resumo escrito pelo mestre e a crônica de cada sessão.
+**ADR-028 — Preparar x Jogar com sessões ao vivo (migration 0005).** A campanha passa a ter dois espaços: _Preparar_ (personagens, NPCs, mapas) e _Jogar_ (a mesa). Jogar acontece dentro de uma **sessão** (`sessions`), que só o mestre inicia e encerra, e cada campanha tem no máximo uma ao vivo (índice único parcial). Mensagens e rolagens recebem `session_id` automaticamente por gatilho no banco, para que o cliente não possa forjá-lo. O mestre escolhe o mapa da cena (`set_scene`), que é compartilhado automaticamente, e os jogadores o seguem. O início da sessão é avisado na sala pessoal `u:<id>` de cada membro, de modo que chega mesmo a quem está em outra página. O histórico mostra o resumo escrito pelo mestre e a crônica de cada sessão.
 
 **ADR-029 — Combate (migration 0006).** O combate tem iniciativa, rodadas, turnos, pontos de vida e condições, com um combate ativo por campanha.
+
 - **Iniciativa:** é rolada no servidor pela regra do sistema. Em Ordem Paranormal é o teste da perícia Iniciativa (p. 93). A rolagem aparece na crônica; a de inimigos fica visível só para o mestre.
 - **Ordem dos turnos:** maior Iniciativa primeiro, com desempate sorteado no banco. A função `advance_turn` só deixa passar a vez o mestre ou o dono do personagem que está na vez, e recusa cliques repetidos.
 - **Inimigos ocultos:** não aparecem para os jogadores por RLS.
@@ -73,32 +74,37 @@ Formato: cada decisão tem contexto, escolha e motivo. "Pendente" = precisa da s
 
 **ADR-031 — Arsenal, rituais, habilidades e bestiário de Ordem Paranormal (migration 0007).**
 
-*Origem dos dados*
+_Origem dos dados_
+
 - Os dados vêm do livro v1.3 por extração automática, com conferência por amostragem: 37 armas, 3 proteções, 82 rituais, progressão das 3 classes, 15 trilhas, poderes de classe, 23 poderes paranormais e 49 criaturas.
 - Guardamos só a mecânica e a página. O texto descritivo é lido no PDF do próprio mestre (regra 1 e regra 7).
 
-*Correções manuais*
+_Correções manuais_
+
 - Nomes de criaturas quebrados em duas linhas foram juntados.
 - As trilhas do Ocultista, cuja página tem diagramação misturada, foram digitadas.
 - Linhas da tabela do Especialista e do Ocultista que ocupavam duas linhas foram completadas.
 - O VD do Estrangeiro foi preenchido.
 - As ameaças mundanas (p. 294–299) ficaram de fora porque a extração não foi confiável. O mestre as adiciona como "Inimigo".
 
-*Ataques (p. 64)*
+_Ataques (p. 64)_
+
 - Corpo a corpo usa Luta e soma Força ao dano.
 - Disparo e arma de fogo usam Pontaria, sem atributo no dano.
 - Arremesso usa Pontaria e soma Força ao dano.
 - O crítico vale quando o d20 que contou atinge a margem da arma, e multiplica só os dados.
 - O acerto contra a Defesa fica a cargo da mesa.
 
-*Rituais (p. 129–131)*
+_Rituais (p. 129–131)_
+
 - O custo é de 1, 3, 6 ou 10 PE conforme o círculo, mais o extra das formas discente e verdadeiro.
 - O servidor recusa o ritual se o custo passar do limite de PE por turno ou se faltar PE.
 - DT = 10 + limite de PE + Presença.
 - Custo paranormal: teste de Ocultismo contra DT 20 + custo. Se falhar, o personagem perde SAN igual ao custo.
 - Rituais de Medo tiram SAN automaticamente. A perda permanente é apenas avisada, porque a ficha ainda não guarda SAN máxima reduzida.
 
-*Equipamento e criaturas*
+_Equipamento e criaturas_
+
 - Defesa e carga usam a nova função de fórmula `gear()`: soma das proteções e espaços ocupados.
 - Carga = 5 × Força, ou 2 com Força 0 (p. 63).
 - Criaturas entram no combate com PV e Iniciativa da ficha.
@@ -151,35 +157,41 @@ Não é necessário agora, mas o custo da IA é variável (ver risks.md). A arqu
 
 **ADR-032 — Biblioteca de fichas, mesa de treino, NPC com ficha, criação guiada e regras completadas (migration 0008).**
 
-*Biblioteca (`library_sheets`)*
+_Biblioteca (`library_sheets`)_
+
 - Cada usuário tem fichas próprias, fora das campanhas; o RLS só deixa o dono ver.
 - A ficha é validada pelo modelo de sistema (`SYSTEM_TEMPLATES`).
 - "Levar para a campanha" cria uma cópia e valida de novo. Personagem exige ser membro; NPC exige ser mestre.
 - Se a campanha usa outro sistema, o servidor recusa com uma mensagem clara. Se a campanha não tem sistema, a ficha entra só com a parte livre.
 - A ida inversa existe: "Guardar cópia nas Fichas" a partir da campanha.
 
-*Mesa de treino*
+_Mesa de treino_
+
 - É uma campanha comum marcada `sandbox`, uma por pessoa (índice único). Só o criador marca, pela função `app_private.mark_sandbox`, porque as colunas de `campaigns` têm permissão por coluna.
 - Já vem com sistema de Ordem Paranormal (reaproveita o sistema do usuário que já tem livro, para que os links de página funcionem), 2 personagens, 2 NPCs (um com ficha completa), mapa compartilhado e mensagem de boas-vindas.
 - "Recomeçar do zero" apaga a mesa (exclusão lógica) e cria outra.
 
-*Ver como jogador*
+_Ver como jogador_
+
 - É um filtro só na tela do mestre. Esconde mensagens do mestre, mapas não compartilhados, peças e combatentes ocultos, PV e fichas de inimigos, e NPCs não revelados.
 - Não é segurança: o mestre já tem esses dados, e o sigilo real continua no servidor (regra 6). Por isso não abrimos uma "sessão falsa" de jogador.
 
-*NPC com ficha*
+_NPC com ficha_
+
 - A ficha fica em `npc_gm_details.sheet`, que só o mestre lê, e é validada como a de personagem.
 - Atacar, conjurar e descansar usam o mesmo serviço `SheetActions` dos personagens, com as mesmas regras.
 - No combate, o NPC entra com o PV da ficha e o mestre ganha botões de arma e ritual.
 
-*Criação guiada*
+_Criação guiada_
+
 - Segue `creation` do sistema:
   - atributos: começam em 1, 4 pontos, um pode cair para 0 com +1 ponto, máximo 3 (p. 24);
   - perícias por classe: escolhas, fixas e livres por fórmula (p. 35, 39, 43);
   - proficiências e 3 rituais iniciais do Ocultista (p. 42).
 - No fim, abre o editor completo para ajustes.
 
-*Regras completadas*
+_Regras completadas_
+
 - As 18 ameaças da realidade (p. 294–299) foram transcritas página a página, com crítico próprio das armas.
 - Perda permanente de recurso (`perm`) reduz o máximo:
   - Medo tira 1, 2 ou 3 de SAN conforme a forma;
@@ -191,6 +203,7 @@ Não é necessário agora, mas o custo da IA é variável (ver risks.md). A arqu
   - relaxar junto dá +1 por participante.
 
 **ADR-033 — Ajuda para iniciantes na criação de personagem.**
+
 - O sistema ganhou uma seção opcional `help`, com textos escritos com palavras próprias e conferidos no livro, sempre com a página:
   - explicação de cada passo da criação;
   - os 5 atributos;
@@ -203,3 +216,17 @@ Não é necessário agora, mas o custo da IA é variável (ver risks.md). A arqu
 - Na ficha completa há um "?" em cada item; o balão fica fixo na tela, para não ser cortado em listas.
 - A ajuda pode ser desligada, e a preferência fica guardada no navegador.
 - O botão "?" usa o rótulo genérico "Mais informações", para não competir com o rótulo do campo ao lado (acessibilidade e testes).
+
+**ADR-034 — Objetos interativos no mapa (migration 0009).**
+
+- Objetos são tokens do tipo `object` com `icon` (catálogo `PROPS` em `packages/shared`), `state` (`open/closed/on/off`) e `rotation`.
+- Os desenhos são SVG feitos à mão no próprio código (`map-props.tsx`): nada de imagens de terceiros.
+- Abrir/fechar e acender/apagar passa pela função `app_private.toggle_prop`, que só alterna o estado. Os jogadores podem usar objetos visíveis de mapas compartilhados, e o mestre pode usar qualquer um. Um objeto oculto responde "não encontrado" para jogadores, para não revelar que existe.
+- Isso é só cenário: abrir uma porta não aplica regra do sistema (nenhuma regra inventada).
+
+**ADR-035 — Mesa "viva" e acessibilidade no navegador.**
+
+- As preferências (tamanho do texto, tema, contraste, menos movimento e sons) ficam no `localStorage` e são aplicadas como atributos `data-*` no `<html>`. Um pequeno script roda antes da página aparecer, para não "piscar".
+- As animações usam classes CSS e respeitam "menos movimento", tanto pela preferência do sistema quanto pela do site.
+- Os sons são sintetizados com WebAudio, sem baixar arquivos.
+- A bandeja de dados é só visual: o resultado mostrado é sempre o que o servidor rolou.

@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { Logo } from '@/components/brand';
 import { LiveSessionNotifier } from '@/components/live-notifier';
 import { NavLinks, SignOutButton } from '@/components/nav';
+import { PrefsMenu, Toaster } from '@/components/prefs-menu';
 import { api } from '@/lib/api';
 import { serverToken } from '@/lib/supabase-server';
 
@@ -13,9 +14,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     <div className="min-h-dvh">
       <header className="sticky top-0 z-20 border-b border-line/70 bg-bg/80 backdrop-blur-md">
         <div className="mx-auto flex h-16 max-w-6xl items-center gap-3 px-3 sm:gap-6 sm:px-6">
-          <Logo href="/dashboard" />
+          <Logo href="/dashboard" compact />
           <NavLinks />
           <div className="ml-auto flex items-center gap-2">
+            <PrefsMenu />
             <Link
               href="/profile"
               className="flex items-center gap-2 rounded-full py-1 pl-1 pr-3 text-sm text-ink-muted transition-colors hover:bg-surface-2 hover:text-ink"
@@ -28,8 +30,11 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           </div>
         </div>
       </header>
-      <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-12">{children}</main>
+      <main id="main" tabIndex={-1} className="outline-none mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-12">
+        {children}
+      </main>
       <LiveSessionNotifier />
+      <Toaster />
     </div>
   );
 }

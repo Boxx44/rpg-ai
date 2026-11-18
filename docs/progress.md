@@ -9,9 +9,25 @@
 
 ---
 
+## 18/11/2026 — Mesa viva, objetos no mapa e acessibilidade
+
+**O que funciona (testado):**
+
+- **Mapa mais bonito:** pisos com textura (assoalho, pedra, tapete, asfalto, terra, neve, azulejo, grama, areia), paredes com volume e sombra, **água e lava se mexendo**, árvores balançando.
+- **Objetos no mapa** (editor → "Objetos"): porta, portão, janela, casa, escada, mesa, cadeira, cama, sofá, estante, computador, baú, caixa, barril, faca, pistola, espingarda, machado, tocha, fogueira, poste de luz, círculo ritual, mancha de sangue, lápide, corpo, armadilha, carro, arbusto e pedra grande. Dá para girar e ocultar.
+- **Objetos que funcionam:** clicar (ou Enter no teclado) abre/fecha portas e baús, acende/apaga tochas e fogueiras, liga o computador e o círculo ritual. Todos veem na hora. Tochas e fogueiras **iluminam** o chão em volta e a chama tremula.
+- **Peças vivas:** sombra, anel de vida (verde/amarelo/vermelho) durante o combate, anel dourado pulsando em quem está na vez, número de dano/cura subindo, peça caída fica cinza, nome aparece ao passar o mouse, movimento suave. As setas do teclado movem a sua peça.
+- **Dados animados:** toda rolagem aparece numa bandeja sobre o mapa, com dados girando até o resultado (o resultado é sempre o do servidor). 20 natural brilha dourado, 1 natural fica vermelho.
+- **Sons** (feitos pelo próprio site, sem arquivos de terceiros): dados, portas, fogo, golpe, crítico, turno e aviso.
+- **Avisos na tela:** "É a sua vez!", sessão começou, ficha salva, acerto crítico, ritual conjurado.
+- **Acessibilidade (botão "Aa" no topo):** tamanho do texto (A, A+, A++), tema escuro ou claro, alto contraste, "menos movimento" e sons com volume. Fica salvo no navegador. Também há o atalho "Pular para o conteúdo" (tecla Tab) e as abas laterais da mesa funcionam com as setas.
+
+**Testes:** rules-engine 57, shared 8, banco 45, API 77 e ponta a ponta 43, todos passando, além de lint e typecheck sem erros.
+
 ## 18/11/2026 — Ajuda na criação de personagem
 
 **O que funciona (testado):**
+
 - **Criação guiada:** um "Ajudante" explica cada passo em linguagem simples e com a página do livro. Ao passar o mouse sobre um atributo, perícia, classe, arma ou ritual, ele explica o que aquilo faz. A origem escolhida mostra o poder que concede.
 - **Ficha completa:** um "?" ao lado de cada atributo, perícia, recurso (PV/PE/SAN), Defesa, NEX, limite de PE, DT, carga, classe e origem. Ao tocar, aparece a explicação.
 - **Ligar e desligar:** o botão "Ajuda ligada/desligada" fica lembrado neste navegador.
@@ -21,6 +37,7 @@
 ## 18/11/2026 — Fichas, mesa de treino e regras completas
 
 **O que funciona (testado):**
+
 - **Fichas** (menu principal): biblioteca pessoal de personagens e NPCs, fora das campanhas.
   - Criação guiada passo a passo: conceito, atributos com contador de pontos, origem, classe, perícias, equipamento e rituais iniciais, com a página do livro em cada passo.
   - Ou ficha em branco.
@@ -36,6 +53,7 @@
 **Testes:** rules-engine 56, shared 8, banco 45, API 76 e ponta a ponta 38, todos passando, além de lint e typecheck sem erros.
 
 **Ainda não feito:**
+
 - Efeito automático das habilidades de classe (por enquanto: nome, NEX e página).
 - Ajustes para celular.
 - Mestre por IA (os modos com IA exigem uma chave de IA paga).
@@ -43,6 +61,7 @@
 ## 18/11/2026 — Arsenal, rituais, habilidades e bestiário (Ordem Paranormal)
 
 **O que funciona (testado):**
+
 - **Armas e proteções na ficha:** escolha entre as 37 armas do livro ou crie uma arma própria. Proteções já somam na Defesa. A carga (5 × Força) avisa quando o personagem está sobrecarregado.
 - **Atacar na mesa:** o botão **Atacar** rola Luta ou Pontaria e, em seguida, o dano. O crítico é detectado e multiplica os dados. Armas de arremesso têm o botão **Arremessar**.
 - **Rituais:** são 82 rituais, com filtro por círculo e elemento. A ficha mostra custo, execução, alcance, alvo, duração e resistência.
@@ -54,6 +73,7 @@
 **Testes:** rules-engine 53, shared 8, banco 43, API 70 e ponta a ponta 34, todos passando, além de lint e typecheck sem erros.
 
 **Ainda não feito:**
+
 - Ameaças mundanas (bandido, policial…) no bestiário; por enquanto entram como "Inimigo".
 - SAN máxima reduzida por perda permanente.
 - Efeito automático de cada habilidade (por enquanto: nome, NEX e página).
@@ -61,6 +81,7 @@
 ## 17/11/2026 — Combate na mesa
 
 **O que funciona (testado):**
+
 - **Cadastro:** a confirmação de e-mail foi desligada no Supabase, a pedido do responsável. Amigos criam conta e já entram.
 - **Iniciar combate:** a mesa tem uma aba **Combate**. O mestre clica em "Iniciar combate" e todos os personagens entram. O mestre adiciona inimigos (vários de uma vez: "Zumbi 1, 2…") ou NPCs, com PV, e pode deixá-los **ocultos**.
 - **Iniciativa:** cada jogador rola a do próprio personagem. A rolagem é feita no servidor pela regra do livro (Ordem: perícia Iniciativa, p. 93) e aparece na crônica. O mestre pode digitar a Iniciativa dos inimigos.
@@ -75,6 +96,7 @@
 ## 17/11/2026 — Preparar x Jogar (sessões ao vivo)
 
 **O que funciona (testado):**
+
 - As abas da campanha estão separadas em **Jogar** (Mesa) e **Preparar** (Personagens, NPCs, Mapas), além de Sessões e Gerenciar.
 - O mestre clica em **Iniciar sessão** (com título opcional). Todos os membros recebem o aviso "Sessão ao vivo — Entrar na mesa", mesmo que estejam em outra página. O painel de campanhas mostra o selo "ao vivo".
 - Durante a sessão, o mestre escolhe **qual mapa todos veem**, e a tela dos jogadores troca sozinha.
@@ -86,7 +108,6 @@
 **Como testar:** abra a campanha como mestre, vá em Mesa e clique em Iniciar sessão. Em outro navegador, entre como jogador e veja o aviso. Depois escolha um mapa em "Mapa para todos" e encerre a sessão; o resumo aparece na aba Sessões.
 
 **Ainda não feito:** combate com iniciativa e turnos, rituais e habilidades por NEX (próximos passos de Ordem Paranormal).
-
 
 ## 17/11/2026 — Fase 1: Fundação
 
