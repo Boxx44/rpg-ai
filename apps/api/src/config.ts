@@ -21,7 +21,9 @@ const envSchema = z
       .min(32)
       .optional()
       .or(z.literal('').transform(() => undefined)),
+    /** Porta: PORT (definida pela hospedagem) tem prioridade. */
     API_PORT: z.coerce.number().int().positive().default(4000),
+    PORT: z.coerce.number().int().positive().optional(),
     WEB_ORIGIN: z.string().url(),
     RATE_LIMIT_PER_MINUTE: z.coerce.number().int().positive().default(120),
     AUDIT_IP_SALT: z.string().optional(),

@@ -72,8 +72,11 @@ export class DocumentQueue implements OnModuleDestroy {
     @Inject(FILE_STORAGE) private readonly storage: FileStorage,
     @Inject(LOGGER) private readonly logger: Logger,
   ) {
+    if (!config.REDIS_URL) {
+      logger.info('Sem Redis: livros são processados direto, sem fila.');
+      return;
+    }
     try {
-      if (!config.REDIS_URL) throw new Error('sem Redis');
       this.conn = new IORedis(config.REDIS_URL, { maxRetriesPerRequest: null, lazyConnect: false });
       this.conn.on('error', (err) => logger.warn({ err: err.message }, 'document queue redis error'));
       this.queue = new Queue('documents', { connection: this.conn });

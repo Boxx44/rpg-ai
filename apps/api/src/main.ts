@@ -9,8 +9,9 @@ async function bootstrap() {
     console.warn(`Migrations aplicadas: ${r.applied.join(', ') || 'nenhuma nova'}`);
   }
   const { app } = await createApp(config);
-  await app.listen(config.API_PORT);
-  console.warn(`API ouvindo em http://localhost:${config.API_PORT}`);
+  const port = config.PORT ?? config.API_PORT;
+  await app.listen(port, '0.0.0.0');
+  console.warn(`API ouvindo na porta ${port}`);
 }
 
 bootstrap().catch((e: unknown) => {
