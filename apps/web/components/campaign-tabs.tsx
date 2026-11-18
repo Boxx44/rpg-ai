@@ -11,7 +11,15 @@ import { usePathname } from 'next/navigation';
  *  - PREPARAR: personagens, NPCs, mapas (o que o mestre monta antes e leva para a sessão).
  * Mais o histórico de sessões e a gestão.
  */
-export function CampaignTabs({ campaignId, manager, live }: { campaignId: string; manager: boolean; live: boolean }) {
+export function CampaignTabs({
+  campaignId,
+  manager,
+  live,
+}: {
+  campaignId: string;
+  manager: boolean;
+  live: boolean;
+}) {
   const path = usePathname();
   const base = `/campaigns/${campaignId}`;
   const prep = [
@@ -30,32 +38,52 @@ export function CampaignTabs({ campaignId, manager, live }: { campaignId: string
         key={t.href}
         href={t.href}
         aria-current={active ? 'page' : undefined}
-        className={cn('relative inline-flex shrink-0 items-center gap-2 px-3 py-2.5 text-sm transition-colors', active ? 'text-ink' : 'text-ink-muted hover:text-ink')}
+        className={cn(
+          'relative inline-flex shrink-0 items-center gap-2 px-3 py-2.5 text-sm transition-colors',
+          active ? 'text-ink' : 'text-ink-muted hover:text-ink',
+        )}
       >
         <t.icon className="size-4" />
         {t.label}
-        {active && <span className="absolute inset-x-2 -bottom-px h-0.5 rounded bg-gradient-to-r from-gold/40 via-gold-bright to-gold/40" />}
+        {active && (
+          <span className="absolute inset-x-2 -bottom-px h-0.5 rounded bg-gradient-to-r from-gold/40 via-gold-bright to-gold/40" />
+        )}
       </Link>
     );
   };
-  const group = (label: string) => <span className="hidden shrink-0 self-center pl-3 pr-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-gold/60 sm:inline">{label}</span>;
+  const group = (label: string) => (
+    <span className="hidden shrink-0 self-center pl-3 pr-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-gold/60 sm:inline">
+      {label}
+    </span>
+  );
   const playActive = path === base;
   return (
-    <nav className="-mx-1 flex items-stretch gap-1 overflow-x-auto border-b border-line pb-px" aria-label="Seções da campanha">
+    <nav
+      className="-mx-1 flex items-stretch gap-1 overflow-x-auto border-b border-line pb-px"
+      aria-label="Seções da campanha"
+    >
       {group('Jogar')}
       <Link
         href={base}
         aria-current={playActive ? 'page' : undefined}
-        className={cn('relative inline-flex shrink-0 items-center gap-2 px-3 py-2.5 text-sm transition-colors', playActive ? 'text-ink' : 'text-ink-muted hover:text-ink')}
+        className={cn(
+          'relative inline-flex shrink-0 items-center gap-2 px-3 py-2.5 text-sm transition-colors',
+          playActive ? 'text-ink' : 'text-ink-muted hover:text-ink',
+        )}
       >
         <Castle className="size-4" />
         Mesa
         {live && (
-          <span className="rounded-full bg-blood px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white" data-testid="live-tab-badge">
+          <span
+            className="rounded-full bg-blood px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white"
+            data-testid="live-tab-badge"
+          >
             ao vivo
           </span>
         )}
-        {playActive && <span className="absolute inset-x-2 -bottom-px h-0.5 rounded bg-gradient-to-r from-gold/40 via-gold-bright to-gold/40" />}
+        {playActive && (
+          <span className="absolute inset-x-2 -bottom-px h-0.5 rounded bg-gradient-to-r from-gold/40 via-gold-bright to-gold/40" />
+        )}
       </Link>
       <span className="mx-1 w-px shrink-0 self-center bg-line" style={{ height: 20 }} />
       {group('Preparar')}

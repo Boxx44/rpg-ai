@@ -1,12 +1,21 @@
 'use client';
 
-import { computeSheet, type SystemDefinition, type SystemValues } from '@rpg-ai/rules-engine';
+import {
+  computeSheet,
+  type RawValues,
+  type SheetProtection,
+  type SheetWeapon,
+  type SystemDefinition,
+  type SystemValues,
+} from '@rpg-ai/rules-engine';
 import { Button, cn, GameIcon, Input, Select } from '@rpg-ai/ui';
 import { Dices, Minus, Plus } from 'lucide-react';
+import { AbilitiesSection, GearSection, RitualsSection } from './system-extras';
 
 export type RollTarget = { skill: string } | { attribute: string };
 
-export function normalizeValues(def: SystemDefinition, v: Partial<SystemValues> | undefined): SystemValues {
+/** Valores vindos do servidor já foram validados; aqui só completamos o que falta. */
+export function normalizeValues(def: SystemDefinition, v: RawValues | undefined): SystemValues {
   return {
     attributes: {
       ...Object.fromEntries(def.attributes.map((a) => [a.key, a.default])),
@@ -20,6 +29,11 @@ export function normalizeValues(def: SystemDefinition, v: Partial<SystemValues> 
     },
     skills: { ...(v?.skills ?? {}) },
     current: { ...(v?.current ?? {}) },
+    weapons: [...((v?.weapons ?? []) as SheetWeapon[])],
+    protections: [...((v?.protections ?? []) as SheetProtection[])],
+    otherSpaces: v?.otherSpaces ?? 0,
+    rituals: [...(v?.rituals ?? [])],
+    powers: [...(v?.powers ?? [])],
   };
 }
 
@@ -54,6 +68,7 @@ export function SystemSheet({
 }) {
   const computed = safeCompute(def, value);
   const set = (patch: Partial<SystemValues>) => onChange({ ...value, ...patch });
+  const derived = (k: string) => computed.derived.find((d) => d.key === k)?.value;
   const gradeBonus = (k?: string) => def.grades.find((g) => g.key === (k ?? def.grades[0]?.key))?.bonus ?? 0;
 
   function setField(key: string, v: string) {
@@ -95,39 +110,41 @@ export function SystemSheet({
       )}
       {def.fields.length > 0 && (
         <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-          {def.fields.map((f) => (
-            <label key={f.key} className="space-y-1.5">
-              <span className="text-xs font-semibold uppercase tracking-[0.12em] text-ink-muted">
-                {f.label}
-              </span>
-              {f.type === 'select' ? (
-                <Select
-                  aria-label={f.label}
-                  value={String(value.fields[f.key] ?? '')}
-                  onChange={(e) => setField(f.key, e.target.value)}
-                  disabled={readOnly}
-                  className="h-9"
-                >
-                  {f.default === undefined && <option value="">—</option>}
-                  {f.options!.map((o) => (
-                    <option key={o.value} value={o.value}>
-                      {o.label}
-                    </option>
-                  ))}
-                </Select>
-              ) : (
-                <Input
-                  aria-label={f.label}
-                  type={f.type === 'number' ? 'number' : 'text'}
-                  value={String(value.fields[f.key] ?? '')}
-                  onChange={(e) => setField(f.key, e.target.value)}
-                  maxLength={120}
-                  disabled={readOnly}
-                  className="h-9"
-                />
-              )}
-            </label>
-          ))}
+          {def.fields
+            .filter((f) => !(f.key === 'trilha' && def.classes.length > 0))
+            .map((f) => (
+              <label key={f.key} className="space-y-1.5">
+                <span className="text-xs font-semibold uppercase tracking-[0.12em] text-ink-muted">
+                  {f.label}
+                </span>
+                {f.type === 'select' ? (
+                  <Select
+                    aria-label={f.label}
+                    value={String(value.fields[f.key] ?? '')}
+                    onChange={(e) => setField(f.key, e.target.value)}
+                    disabled={readOnly}
+                    className="h-9"
+                  >
+                    {f.default === undefined && <option value="">—</option>}
+                    {f.options!.map((o) => (
+                      <option key={o.value} value={o.value}>
+                        {o.label}
+                      </option>
+                    ))}
+                  </Select>
+                ) : (
+                  <Input
+                    aria-label={f.label}
+                    type={f.type === 'number' ? 'number' : 'text'}
+                    value={String(value.fields[f.key] ?? '')}
+                    onChange={(e) => setField(f.key, e.target.value)}
+                    maxLength={120}
+                    disabled={readOnly}
+                    className="h-9"
+                  />
+                )}
+              </label>
+            ))}
         </section>
       )}
 
@@ -324,6 +341,16 @@ export function SystemSheet({
           <p className="mt-2 text-xs text-ink-faint">* somente treinada · + sofre penalidade de carga</p>
         </section>
       )}
+      <GearSection
+        def={def}
+        value={value}
+        set={set}
+        readOnly={readOnly}
+        usedSpaces={derived('carga_usada')}
+        maxSpaces={derived('carga')}
+      />
+      <RitualsSection def={def} value={value} set={set} readOnly={readOnly} dt={derived('dt_rituais')} />
+      <AbilitiesSection def={def} value={value} set={set} readOnly={readOnly} />
     </div>
   );
 }

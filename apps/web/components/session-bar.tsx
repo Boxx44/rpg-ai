@@ -50,36 +50,62 @@ export function SessionBar({
 
   if (!live) {
     return (
-      <div className="flex flex-wrap items-center gap-3 rounded-xl border border-line bg-surface/80 px-4 py-3" data-testid="session-bar" data-live="false">
+      <div
+        className="flex flex-wrap items-center gap-3 rounded-xl border border-line bg-surface/80 px-4 py-3"
+        data-testid="session-bar"
+        data-live="false"
+      >
         <span className="size-2.5 rounded-full bg-ink-faint" />
         <p className="flex-1 text-sm text-ink-muted">
-          {manager ? 'Nenhuma sessão ao vivo. Prepare a mesa e inicie quando o grupo estiver pronto.' : 'Aguardando o mestre iniciar a sessão.'}
+          {manager
+            ? 'Nenhuma sessão ao vivo. Prepare a mesa e inicie quando o grupo estiver pronto.'
+            : 'Aguardando o mestre iniciar a sessão.'}
         </p>
         {manager && (
           <form
             className="flex flex-wrap items-center gap-2"
             onSubmit={async (e) => {
               e.preventDefault();
-              const s = await call((t) => api<SessionDto>(`/campaigns/${campaignId}/sessions`, t, { method: 'POST', body: json({ title }) }));
+              const s = await call((t) =>
+                api<SessionDto>(`/campaigns/${campaignId}/sessions`, t, {
+                  method: 'POST',
+                  body: json({ title }),
+                }),
+              );
               if (s) {
                 setTitle('');
                 onStarted(s);
               }
             }}
           >
-            <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Título da sessão (opcional)" aria-label="Título da sessão" maxLength={120} className="h-9 w-56" />
+            <Input
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="Título da sessão (opcional)"
+              aria-label="Título da sessão"
+              maxLength={120}
+              className="h-9 w-56"
+            />
             <Button type="submit" loading={busy}>
               <Play /> Iniciar sessão
             </Button>
           </form>
         )}
-        {error && <Alert tone="error" className="w-full">{error}</Alert>}
+        {error && (
+          <Alert tone="error" className="w-full">
+            {error}
+          </Alert>
+        )}
       </div>
     );
   }
 
   return (
-    <div className="space-y-3 rounded-xl border border-blood/40 bg-gradient-to-r from-blood/10 via-surface/80 to-surface/80 px-4 py-3" data-testid="session-bar" data-live="true">
+    <div
+      className="space-y-3 rounded-xl border border-blood/40 bg-gradient-to-r from-blood/10 via-surface/80 to-surface/80 px-4 py-3"
+      data-testid="session-bar"
+      data-live="true"
+    >
       <div className="flex flex-wrap items-center gap-3">
         <span className="relative flex size-2.5">
           <span className="absolute inline-flex size-full animate-ping rounded-full bg-blood opacity-70" />
@@ -97,7 +123,12 @@ export function SessionBar({
               className="h-9 w-56"
               onChange={async (e) => {
                 const mapId = e.target.value || null;
-                const s = await call((t) => api<SessionDto>(`/campaigns/${campaignId}/sessions/${live.id}/scene`, t, { method: 'POST', body: json({ mapId }) }));
+                const s = await call((t) =>
+                  api<SessionDto>(`/campaigns/${campaignId}/sessions/${live.id}/scene`, t, {
+                    method: 'POST',
+                    body: json({ mapId }),
+                  }),
+                );
                 if (s) onScene(s.activeMapId);
               }}
             >
@@ -119,7 +150,12 @@ export function SessionBar({
           className="space-y-2"
           onSubmit={async (e) => {
             e.preventDefault();
-            const s = await call((t) => api<SessionDto>(`/campaigns/${campaignId}/sessions/${live.id}/end`, t, { method: 'POST', body: json({ summary }) }));
+            const s = await call((t) =>
+              api<SessionDto>(`/campaigns/${campaignId}/sessions/${live.id}/end`, t, {
+                method: 'POST',
+                body: json({ summary }),
+              }),
+            );
             if (s) {
               setEnding(false);
               setSummary('');
@@ -127,7 +163,13 @@ export function SessionBar({
             }
           }}
         >
-          <Textarea value={summary} onChange={(e) => setSummary(e.target.value)} placeholder="Resumo da sessão: o que aconteceu, ganchos para a próxima… (opcional)" aria-label="Resumo da sessão" maxLength={8000} />
+          <Textarea
+            value={summary}
+            onChange={(e) => setSummary(e.target.value)}
+            placeholder="Resumo da sessão: o que aconteceu, ganchos para a próxima… (opcional)"
+            aria-label="Resumo da sessão"
+            maxLength={8000}
+          />
           <div className="flex justify-end gap-2">
             <Button type="button" variant="ghost" onClick={() => setEnding(false)}>
               Continuar jogando

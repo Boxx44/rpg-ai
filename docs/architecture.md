@@ -251,6 +251,8 @@ Existem hoje: `apps/web`, `apps/api`, `packages/{db,shared,ui,logger,rules-engin
 
 **Combate:** as rotas ficam em `campaigns/:id/combat`: ver, iniciar, adicionar, editar e remover combatentes, rolar Iniciativa, aplicar PV, passar o turno e encerrar. Cada mudança emite `combat.changed` na sala da campanha, e cada navegador busca o combate de novo. Assim, o filtro do que cada pessoa pode ver (ocultos e PV do mestre) é sempre aplicado no servidor, e não no evento.
 
+**Ações de personagem:** `POST characters/:id/attack` e `POST characters/:id/cast`. O motor de regras (`buildAttack`, `planRitual`) monta as rolagens a partir da ficha e da definição do sistema. O servidor rola, grava na crônica e desconta recursos. Criaturas: `POST combat/combatants/:id/attack`, só para o mestre.
+
 **Fluxo de autenticação implementado:** o navegador faz login no Supabase Auth → recebe um token (JWT) → envia o token à API → a API verifica a assinatura (segredo HS256 ou chaves públicas JWKS) → confirma que a conta existe e está ativa → executa a consulta no banco com o papel do usuário (RLS ativo).
 
 ## 8. Dependências externas

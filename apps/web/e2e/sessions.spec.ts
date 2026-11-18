@@ -90,7 +90,10 @@ test('mensagens entram na sessão; mestre encerra com resumo', async () => {
 });
 
 test('histórico mostra a sessão, o resumo e a crônica', async () => {
-  await plPage.getByRole('navigation', { name: 'Seções da campanha' }).getByRole('link', { name: 'Sessões' }).click();
+  await plPage
+    .getByRole('navigation', { name: 'Seções da campanha' })
+    .getByRole('link', { name: 'Sessões' })
+    .click();
   const card = plPage.getByTestId('session-card');
   await expect(card).toContainText('O último trem');
   await expect(card).toContainText('O grupo embarcou no último trem.');

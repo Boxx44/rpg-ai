@@ -14,6 +14,7 @@ import {
   buildInitiative,
   computeSheet,
   FormulaError,
+  keptD20,
   sanitizeValues,
   type SystemDefinition,
   validateSystem,
@@ -23,6 +24,7 @@ import {
   type AddCombatantInput,
   addCombatantSchema,
   canManageCampaign,
+  creatureAttackSchema,
   type CharacterSheet,
   characterSheetSchema,
   type CombatantDto,
@@ -54,6 +56,26 @@ const ch = schema.characters;
 
 function pgCode(e: unknown): string | undefined {
   return (e as { code?: string }).code ?? (e as { cause?: { code?: string } }).cause?.code;
+}
+
+const ELEMENT_COLORS: Record<string, string> = {
+  sangue: '#b4232f',
+  morte: '#5b5b5b',
+  conhecimento: '#c9a24b',
+  energia: '#8b5cf6',
+  medo: '#e5e7eb',
+};
+
+function creatureInfo(def: SystemDefinition | null, key: string) {
+  const c = def?.creatures.find((x) => x.key === key);
+  if (!c) return null;
+  return {
+    key,
+    defesa: c.defesa,
+    vd: c.vd,
+    page: c.page,
+    attacks: c.attacks.map(({ name, times, test, damage, type }) => ({ name, times, test, damage, type })),
+  };
 }
 
 export function healthOf(current: number, max: number): CombatHealth {
@@ -163,6 +185,7 @@ export class CombatService {
         defeated: c.defeated,
         hp,
         mine: manager || owner?.ownerId === userId,
+        creature: manager && c.creatureKey ? creatureInfo(def, c.creatureKey) : null,
       };
     });
     const visible = combatants.some((c) => c.id === e.currentCombatantId);
@@ -211,18 +234,16 @@ export class CombatService {
           .where(and(eq(ch.campaignId, cid), isNull(ch.deletedAt)))
           .orderBy(asc(ch.createdAt));
         if (list.length)
-          await tx
-            .insert(cb)
-            .values(
-              list.map((c) => ({
-                encounterId: id,
-                campaignId: cid,
-                kind: 'character' as const,
-                characterId: c.id,
-                name: c.name,
-                color: c.color,
-              })),
-            );
+          await tx.insert(cb).values(
+            list.map((c) => ({
+              encounterId: id,
+              campaignId: cid,
+              kind: 'character' as const,
+              characterId: c.id,
+              name: c.name,
+              color: c.color,
+            })),
+          );
       }
       await audit(tx, ctx, {
         action: 'combat.started',
@@ -247,20 +268,40 @@ export class CombatService {
           .where(and(eq(ch.id, input.characterId), eq(ch.campaignId, cid), isNull(ch.deletedAt)));
         if (!c) throw notFound('Personagem');
         try {
-          await tx
-            .insert(cb)
-            .values({
-              encounterId: eid,
-              campaignId: cid,
-              kind: 'character',
-              characterId: input.characterId,
-              name: c.name,
-              color: c.color,
-            });
+          await tx.insert(cb).values({
+            encounterId: eid,
+            campaignId: cid,
+            kind: 'character',
+            characterId: input.characterId,
+            name: c.name,
+            color: c.color,
+          });
         } catch (e) {
           if (pgCode(e) === '23505')
             throw new AppError(ERROR_CODES.CONFLICT, 'Este personagem já está no combate.', 409);
           throw e;
+        }
+      } else if (input.kind === 'creature') {
+        const def = await this.definition(tx, cid);
+        const cr = def?.creatures.find((x) => x.key === input.creatureKey);
+        if (!cr) throw notFound('Criatura');
+        for (let i = 1; i <= input.count; i++) {
+          const name = input.count > 1 ? `${cr.name.slice(0, 76)} ${i}` : cr.name;
+          const [row] = await tx
+            .insert(cb)
+            .values({
+              encounterId: eid,
+              campaignId: cid,
+              kind: 'enemy',
+              creatureKey: cr.key,
+              name,
+              color: ELEMENT_COLORS[cr.element ?? ''] ?? '#b4232f',
+              hidden: input.hidden,
+            })
+            .returning({ id: cb.id });
+          await tx
+            .insert(gm)
+            .values({ combatantId: row!.id, campaignId: cid, hpCurrent: cr.pv, hpMax: cr.pv });
         }
       } else {
         let base = { name: '', color: '#b4232f', npcId: null as string | null };
@@ -385,6 +426,11 @@ export class CombatService {
           throw e;
         }
       }
+      if (!c.characterId && def) {
+        const [row] = await tx.select({ key: cb.creatureKey }).from(cb).where(eq(cb.id, id));
+        const ini = row?.key ? def.creatures.find((x) => x.key === row.key)?.iniciativa : null;
+        if (ini) expression = ini;
+      }
       if (bonus) expression = `${expression}${bonus > 0 ? '+' : ''}${bonus}`;
       return { expression, name: c.name, hidden: c.hidden || c.kind !== 'character' };
     });
@@ -463,6 +509,46 @@ export class CombatService {
     this.changed(cid);
     if (charChanged) this.rt.campaign(cid, WS_EVENTS.charactersChanged, { campaignId: cid });
     return dto;
+  }
+
+  /** Ataque de criatura do livro: teste e dano da ficha (crítico 20/x2, p. 189). */
+  async creatureAttack(userId: string, cid: string, id: string, index: number) {
+    const plan = await withUser(this.db, userId, async (tx) => {
+      await requireManager(tx, cid);
+      const eid = await this.requireActive(tx, cid);
+      const [c] = await tx
+        .select()
+        .from(cb)
+        .where(and(eq(cb.id, id), eq(cb.encounterId, eid)));
+      if (!c?.creatureKey) throw notFound('Criatura');
+      const info = creatureInfo(await this.definition(tx, cid), c.creatureKey);
+      const atk = info?.attacks[index];
+      if (!atk) throw notFound('Ataque');
+      return { atk, name: c.name, hidden: c.hidden };
+    });
+    const visibility = plan.hidden ? ('gm' as const) : ('public' as const);
+    const test = await this.chat.roll(userId, cid, {
+      expression: plan.atk.test,
+      label: `${plan.name}: ${plan.atk.name}`.slice(0, 80),
+      visibility,
+    });
+    const natural = test.roll
+      ? keptD20({ expression: test.roll.expression, total: test.roll.total, parts: test.roll.parts as never })
+      : null;
+    const critical = natural === 20;
+    const dice = /^(\d+)d(\d+)(.*)$/.exec(plan.atk.damage);
+    const expr = critical && dice ? `${Number(dice[1]) * 2}d${dice[2]}${dice[3]}` : plan.atk.damage;
+    const dmg = await this.chat.roll(userId, cid, {
+      expression: expr,
+      label: `${plan.name}: dano${critical ? ' CRÍTICO' : ''} (${plan.atk.type})`.slice(0, 80),
+      visibility,
+    });
+    return {
+      messages: [test, dmg],
+      critical,
+      notes:
+        plan.atk.times > 1 ? [`Esta ação faz ${plan.atk.times} ataques: role de novo para os demais.`] : [],
+    };
   }
 
   async next(userId: string, cid: string, expected: string | null) {
@@ -551,6 +637,16 @@ export class CombatController {
     @Ctx() ctx: RequestCtx,
   ) {
     return this.svc.changeHp(u.id, campaignId(id), anyId(c), parse(hpChangeSchema, b).delta, ctx);
+  }
+  @Post('combatants/:cid/attack')
+  @HttpCode(200)
+  creatureAttack(
+    @CurrentUser() u: AuthUser,
+    @Param('id') id: string,
+    @Param('cid') c: string,
+    @Body() b: unknown,
+  ) {
+    return this.svc.creatureAttack(u.id, campaignId(id), anyId(c), parse(creatureAttackSchema, b).attack);
   }
   @Post('next')
   @HttpCode(200)

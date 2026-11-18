@@ -9,7 +9,13 @@ import { api, json } from '@/lib/api';
 import { accessToken } from '@/lib/supabase';
 
 function fmt(d: string) {
-  return new Date(d).toLocaleString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+  return new Date(d).toLocaleString('pt-BR', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
 }
 
 function SessionCard({ s, campaignId, manager }: { s: SessionDto; campaignId: string; manager: boolean }) {
@@ -23,7 +29,12 @@ function SessionCard({ s, campaignId, manager }: { s: SessionDto; campaignId: st
     setOpen((o) => !o);
     if (!messages) {
       try {
-        setMessages(await api<ChatMessageDto[]>(`/campaigns/${campaignId}/messages?session=${s.id}&limit=100`, await accessToken()));
+        setMessages(
+          await api<ChatMessageDto[]>(
+            `/campaigns/${campaignId}/messages?session=${s.id}&limit=100`,
+            await accessToken(),
+          ),
+        );
       } catch (e) {
         setError(e instanceof Error ? e.message : 'Erro');
       }
@@ -57,7 +68,16 @@ function SessionCard({ s, campaignId, manager }: { s: SessionDto; campaignId: st
           <p className="text-xs font-semibold uppercase tracking-[0.15em] text-gold/80">Resumo</p>
           {manager ? (
             <>
-              <Textarea value={summary} onChange={(e) => { setSummary(e.target.value); setSaved(false); }} placeholder="Escreva o que aconteceu nesta sessão…" maxLength={8000} aria-label={`Resumo da sessão ${s.number}`} />
+              <Textarea
+                value={summary}
+                onChange={(e) => {
+                  setSummary(e.target.value);
+                  setSaved(false);
+                }}
+                placeholder="Escreva o que aconteceu nesta sessão…"
+                maxLength={8000}
+                aria-label={`Resumo da sessão ${s.number}`}
+              />
               <div className="flex items-center justify-end gap-3">
                 {saved && <span className="text-xs text-emerald-300">Salvo</span>}
                 <Button
@@ -65,7 +85,10 @@ function SessionCard({ s, campaignId, manager }: { s: SessionDto; campaignId: st
                   variant="secondary"
                   onClick={async () => {
                     try {
-                      await api(`/campaigns/${campaignId}/sessions/${s.id}`, await accessToken(), { method: 'PATCH', body: json({ summary }) });
+                      await api(`/campaigns/${campaignId}/sessions/${s.id}`, await accessToken(), {
+                        method: 'PATCH',
+                        body: json({ summary }),
+                      });
                       setSaved(true);
                     } catch (e) {
                       setError(e instanceof Error ? e.message : 'Erro');
@@ -82,7 +105,10 @@ function SessionCard({ s, campaignId, manager }: { s: SessionDto; campaignId: st
         </div>
       )}
       {open && (
-        <ul className="mt-4 max-h-96 space-y-2 overflow-y-auto rounded-lg border border-line bg-bg/40 p-3 text-sm" data-testid="session-chronicle">
+        <ul
+          className="mt-4 max-h-96 space-y-2 overflow-y-auto rounded-lg border border-line bg-bg/40 p-3 text-sm"
+          data-testid="session-chronicle"
+        >
           {messages === null && <li className="text-ink-faint">Carregando…</li>}
           {messages?.length === 0 && <li className="text-ink-faint">Nada foi registrado nesta sessão.</li>}
           {messages?.map((m) => (
@@ -90,7 +116,8 @@ function SessionCard({ s, campaignId, manager }: { s: SessionDto; campaignId: st
               <b className="text-arcane-200">{m.npc?.name ?? m.author.displayName}:</b>{' '}
               {m.roll ? (
                 <span>
-                  {m.roll.label || 'rolagem'} ({m.roll.expression}) = <b className="text-gold-bright">{m.roll.total}</b>
+                  {m.roll.label || 'rolagem'} ({m.roll.expression}) ={' '}
+                  <b className="text-gold-bright">{m.roll.total}</b>
                 </span>
               ) : (
                 <span className="text-ink">{m.content}</span>
@@ -99,16 +126,31 @@ function SessionCard({ s, campaignId, manager }: { s: SessionDto; campaignId: st
           ))}
         </ul>
       )}
-      {error && <Alert tone="error" className="mt-3">{error}</Alert>}
+      {error && (
+        <Alert tone="error" className="mt-3">
+          {error}
+        </Alert>
+      )}
     </Card>
   );
 }
 
-export function SessionsHistory({ campaignId, sessions, manager }: { campaignId: string; sessions: SessionDto[]; manager: boolean }) {
+export function SessionsHistory({
+  campaignId,
+  sessions,
+  manager,
+}: {
+  campaignId: string;
+  sessions: SessionDto[];
+  manager: boolean;
+}) {
   if (!sessions.length)
     return (
       <Card className="p-10 text-center text-sm text-ink-muted">
-        Nenhuma sessão jogada ainda. {manager ? 'Vá até a Mesa e clique em "Iniciar sessão".' : 'Quando o mestre iniciar, você recebe um aviso.'}
+        Nenhuma sessão jogada ainda.{' '}
+        {manager
+          ? 'Vá até a Mesa e clique em "Iniciar sessão".'
+          : 'Quando o mestre iniciar, você recebe um aviso.'}
       </Card>
     );
   return (

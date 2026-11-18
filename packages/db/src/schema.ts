@@ -291,6 +291,7 @@ export const combatants = pgTable('combatants', {
   kind: text('kind').$type<'character' | 'npc' | 'enemy'>().notNull(),
   characterId: uuid('character_id'),
   npcId: uuid('npc_id'),
+  creatureKey: text('creature_key'),
   name: text('name').notNull(),
   color: text('color').notNull().default('#b4232f'),
   initiative: integer('initiative'),

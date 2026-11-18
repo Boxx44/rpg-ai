@@ -53,6 +53,11 @@ export function GameTable({
   const [combat, setCombat] = useState<EncounterDto | null>(initialCombat);
   const [live, setLive] = useState<SessionDto | null>(initialLive);
   const [tab, setTab] = useState<'chat' | 'combat' | 'sheet' | 'rules'>('chat');
+  const [pageReq, setPageReq] = useState<{ page: number; nonce: number } | null>(null);
+  const openBookPage = useCallback((page: number) => {
+    setTab('rules');
+    setPageReq({ page, nonce: Date.now() });
+  }, []);
   const [characters, setCharacters] = useState(initialCharacters);
   const manager = canManageCampaign(myRole);
   const [messages, setMessages] = useState(initialMessages);
@@ -198,7 +203,9 @@ export function GameTable({
             if (id) setMapId(id);
           }}
         />
-        {combat && <CombatBanner campaignId={campaignId} combat={combat} manager={manager} onChange={setCombat} />}
+        {combat && (
+          <CombatBanner campaignId={campaignId} combat={combat} manager={manager} onChange={setCombat} />
+        )}
         <div className="flex flex-wrap items-center gap-2">
           {followsScene ? (
             <span className="inline-flex items-center gap-2 text-sm text-ink-muted" data-testid="scene-name">
@@ -320,7 +327,15 @@ export function GameTable({
         {tab !== 'chat' && (
           <section className="min-h-[420px] flex-1 overflow-hidden rounded-xl border border-line bg-surface/80">
             {tab === 'combat' ? (
-              <CombatPanel campaignId={campaignId} combat={combat} manager={manager} system={system} npcs={npcs} onChange={setCombat} />
+              <CombatPanel
+                campaignId={campaignId}
+                combat={combat}
+                manager={manager}
+                system={system}
+                npcs={npcs}
+                onChange={setCombat}
+                onOpenPage={openBookPage}
+              />
             ) : tab === 'sheet' ? (
               <QuickSheetPanel
                 campaignId={campaignId}
@@ -329,9 +344,10 @@ export function GameTable({
                 myId={myId}
                 manager={manager}
                 onUpdated={(c) => setCharacters((list) => list.map((x) => (x.id === c.id ? c : x)))}
+                onOpenPage={openBookPage}
               />
             ) : (
-              <RulesPanel campaignId={campaignId} system={system} manager={manager} />
+              <RulesPanel campaignId={campaignId} system={system} manager={manager} openPage={pageReq} />
             )}
           </section>
         )}

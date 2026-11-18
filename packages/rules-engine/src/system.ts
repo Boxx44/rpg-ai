@@ -106,9 +106,158 @@ export const systemDefinitionSchema = z.object({
     .max(60)
     .default([]),
   /** Como a Iniciativa é rolada: teste de uma perícia do sistema (ou atributo). */
-  initiative: z
-    .object({ skill: key.optional(), attribute: key.optional(), page })
+  initiative: z.object({ skill: key.optional(), attribute: key.optional(), page }).optional(),
+  /** Como ataques são resolvidos: perícia do teste e atributo somado ao dano. */
+  combat: z
+    .object({
+      melee: z.object({ skill: key, damageAttr: key.optional() }),
+      ranged: z.object({ skill: key, damageAttr: key.optional() }),
+      thrown: z.object({ skill: key, damageAttr: key.optional() }),
+      page,
+    })
     .optional(),
+  /** Armas do livro (tabela de armas). */
+  weapons: z
+    .array(
+      z.object({
+        key,
+        name: z.string().max(60),
+        proficiency: z.string().max(20),
+        kind: z.enum(['melee', 'ranged']),
+        ranged: z.enum(['arremesso', 'disparo', 'fogo']).optional(),
+        grip: z.string().max(20),
+        damage: z.string().max(20),
+        damageAlt: z.string().max(20).optional(),
+        critRange: z.number().int().min(2).max(20),
+        critMult: z.number().int().min(2).max(10),
+        range: z.string().max(20).optional(),
+        damageType: z.string().max(30),
+        spaces: z.number().int().min(0).max(20),
+        category: z.string().max(5),
+        page,
+      }),
+    )
+    .max(200)
+    .default([]),
+  protections: z
+    .array(
+      z.object({
+        key,
+        name: z.string().max(60),
+        defense: z.number().int(),
+        category: z.string().max(5),
+        spaces: z.number().int(),
+        page,
+      }),
+    )
+    .max(50)
+    .default([]),
+  /** Rituais: só mecânica (custo, alcance, duração…) + página. */
+  rituals: z
+    .array(
+      z.object({
+        key,
+        name: z.string().max(60),
+        elements: z.array(z.string().max(20)).min(1).max(5),
+        circle: z.number().int().min(1).max(9),
+        execution: z.string().max(40),
+        range: z.string().max(60),
+        duration: z.string().max(80),
+        target: z.string().max(120).optional(),
+        area: z.string().max(120).optional(),
+        effect: z.string().max(120).optional(),
+        resistance: z.string().max(120).optional(),
+        discente: z.number().int().optional(),
+        verdadeiro: z.number().int().optional(),
+        damage: z.object({ dice: z.string().max(30), type: z.string().max(30) }).optional(),
+        heal: z.string().max(30).optional(),
+        page,
+      }),
+    )
+    .max(300)
+    .default([]),
+  /** Regras de rituais: custo por círculo, DT e custo paranormal. */
+  ritualRules: z
+    .object({
+      costByCircle: z.record(z.number().int()),
+      /** Fórmula da DT de resistência. */
+      dt: z.string().max(200),
+      /** Perícia do teste de custo paranormal (DT 20 + custo). */
+      sanityCheckSkill: key.optional(),
+      /** Recurso gasto ao conjurar e recurso perdido no custo paranormal. */
+      spend: key,
+      sanity: key.optional(),
+      /** Elemento cujo custo em Sanidade é automático (Medo). */
+      fearElement: z.string().max(20).optional(),
+      page,
+    })
+    .optional(),
+  /** Habilidades por classe: progressão por NEX, poderes e trilhas. */
+  classes: z
+    .array(
+      z.object({
+        key,
+        label: z.string().max(40),
+        page,
+        progression: z.array(z.object({ nex: z.number().int(), text: z.string().max(120) })).max(40),
+        powers: z
+          .array(z.object({ key, name: z.string().max(60), prereq: z.string().max(160), page }))
+          .max(80),
+        trails: z
+          .array(
+            z.object({
+              key,
+              name: z.string().max(60),
+              page,
+              abilities: z.array(z.object({ nex: z.number().int(), name: z.string().max(60), page })).max(10),
+            }),
+          )
+          .max(20),
+      }),
+    )
+    .max(20)
+    .default([]),
+  /** Poderes paranormais. */
+  powers: z
+    .array(
+      z.object({
+        key,
+        name: z.string().max(60),
+        element: z.string().max(20),
+        prereq: z.string().max(160),
+        page,
+      }),
+    )
+    .max(100)
+    .default([]),
+  /** Ameaças/criaturas para o combate. */
+  creatures: z
+    .array(
+      z.object({
+        key,
+        name: z.string().max(80),
+        element: z.string().max(20).nullable(),
+        vd: z.number().int().nullable(),
+        pv: z.number().int().min(0),
+        defesa: z.number().int().nullable(),
+        iniciativa: z.string().max(40).nullable(),
+        attacks: z
+          .array(
+            z.object({
+              name: z.string().max(60),
+              kind: z.enum(['melee', 'ranged']),
+              times: z.number().int().min(1).max(10),
+              test: z.string().max(40),
+              damage: z.string().max(40),
+              type: z.string().max(30),
+            }),
+          )
+          .max(10),
+        page,
+      }),
+    )
+    .max(300)
+    .default([]),
   /** Resumo das regras centrais, escrito com palavras próprias, com página de referência. */
   reference: z
     .array(z.object({ title: z.string().max(80), text: z.string().max(600), page }))
@@ -117,11 +266,37 @@ export const systemDefinitionSchema = z.object({
 });
 export type SystemDefinition = z.infer<typeof systemDefinitionSchema>;
 
+export interface SheetWeapon {
+  /** Arma do livro (opcional; armas próprias não têm). */
+  ref?: string;
+  name: string;
+  kind: 'melee' | 'ranged';
+  ranged?: 'arremesso' | 'disparo' | 'fogo';
+  damage: string;
+  critRange: number;
+  critMult: number;
+  damageType: string;
+  spaces: number;
+  /** Bônus fixo no ataque (mira, modificações…). */
+  attackBonus: number;
+}
+export interface SheetProtection {
+  ref?: string;
+  name: string;
+  defense: number;
+  spaces: number;
+}
 export interface SystemValues {
   attributes: Record<string, number>;
   fields: Record<string, string | number>;
   skills: Record<string, string>;
   current: Record<string, number>;
+  weapons: SheetWeapon[];
+  protections: SheetProtection[];
+  /** Espaços de outros itens (inventário livre). */
+  otherSpaces: number;
+  rituals: string[];
+  powers: string[];
 }
 
 /** Valida a definição inteira, incluindo se todas as fórmulas são seguras e coerentes. */
@@ -147,11 +322,23 @@ export function emptyValues(def: SystemDefinition): SystemValues {
     ),
     skills: {},
     current: {},
+    weapons: [],
+    protections: [],
+    otherSpaces: 0,
+    rituals: [],
+    powers: [],
   };
 }
 
+const DICE_RE = /^\d{1,2}d\d{1,3}$/;
+
 /** Corrige/valida valores vindos do usuário de acordo com o sistema. Lança erro em português. */
-export function sanitizeValues(def: SystemDefinition, raw: Partial<SystemValues> | undefined): SystemValues {
+export type RawValues = Partial<Omit<SystemValues, 'weapons' | 'protections'>> & {
+  weapons?: Partial<SheetWeapon>[];
+  protections?: Partial<SheetProtection>[];
+};
+
+export function sanitizeValues(def: SystemDefinition, raw: RawValues | undefined): SystemValues {
   const v = emptyValues(def);
   const r = raw ?? {};
   for (const a of def.attributes) {
@@ -183,6 +370,85 @@ export function sanitizeValues(def: SystemDefinition, raw: Partial<SystemValues>
     if (!Number.isInteger(x) || Math.abs(x) > 99999) throw new FormulaError(`${res.label} inválido`);
     v.current[res.key] = x;
   }
+  if (r.weapons !== undefined) {
+    if (!Array.isArray(r.weapons) || r.weapons.length > 30)
+      throw new FormulaError('Armas demais (máximo 30)');
+    v.weapons = r.weapons.map((w) => {
+      const book = w.ref ? def.weapons.find((x) => x.key === w.ref) : undefined;
+      if (w.ref && !book) throw new FormulaError(`Arma desconhecida: ${w.ref}`);
+      const name = String(w.name ?? book?.name ?? '')
+        .trim()
+        .slice(0, 60);
+      if (!name) throw new FormulaError('Toda arma precisa de nome');
+      const damage = String(w.damage ?? book?.damage ?? '').replace(/\s/g, '');
+      if (!DICE_RE.test(damage)) throw new FormulaError(`Dano inválido em ${name} (use algo como 1d8)`);
+      const int = (x: unknown, lo: number, hi: number, d: number) => {
+        const n = x === undefined ? d : Number(x);
+        if (!Number.isInteger(n) || n < lo || n > hi) throw new FormulaError(`Valor inválido em ${name}`);
+        return n;
+      };
+      const kind = w.kind ?? book?.kind ?? 'melee';
+      if (kind !== 'melee' && kind !== 'ranged') throw new FormulaError(`Tipo inválido em ${name}`);
+      const ranged = w.ranged ?? book?.ranged;
+      if (ranged && !['arremesso', 'disparo', 'fogo'].includes(ranged))
+        throw new FormulaError(`Tipo inválido em ${name}`);
+      return {
+        ...(book ? { ref: book.key } : {}),
+        name,
+        kind,
+        ...(ranged ? { ranged } : {}),
+        damage,
+        critRange: int(w.critRange ?? book?.critRange, 2, 20, 20),
+        critMult: int(w.critMult ?? book?.critMult, 2, 10, 2),
+        damageType: String(w.damageType ?? book?.damageType ?? '').slice(0, 30),
+        spaces: int(w.spaces ?? book?.spaces, 0, 20, 1),
+        attackBonus: int(w.attackBonus, -50, 50, 0),
+      };
+    });
+  }
+  if (r.protections !== undefined) {
+    if (!Array.isArray(r.protections) || r.protections.length > 5)
+      throw new FormulaError('Proteções demais (máximo 5)');
+    v.protections = r.protections.map((p) => {
+      const book = p.ref ? def.protections.find((x) => x.key === p.ref) : undefined;
+      if (p.ref && !book) throw new FormulaError(`Proteção desconhecida: ${p.ref}`);
+      const name = String(p.name ?? book?.name ?? '')
+        .trim()
+        .slice(0, 60);
+      const defense = Number(p.defense ?? book?.defense ?? 0);
+      const spaces = Number(p.spaces ?? book?.spaces ?? 0);
+      if (
+        !name ||
+        !Number.isInteger(defense) ||
+        Math.abs(defense) > 50 ||
+        !Number.isInteger(spaces) ||
+        spaces < 0 ||
+        spaces > 20
+      )
+        throw new FormulaError('Proteção inválida');
+      return { ...(book ? { ref: book.key } : {}), name, defense, spaces };
+    });
+  }
+  if (r.otherSpaces !== undefined) {
+    if (!Number.isInteger(r.otherSpaces) || r.otherSpaces < 0 || r.otherSpaces > 200)
+      throw new FormulaError('Espaços de itens inválidos');
+    v.otherSpaces = r.otherSpaces;
+  }
+  if (r.rituals !== undefined) {
+    const known = new Set(def.rituals.map((x) => x.key));
+    const bad = r.rituals.find((k) => !known.has(k));
+    if (bad) throw new FormulaError(`Ritual desconhecido: ${bad}`);
+    v.rituals = [...new Set(r.rituals)].slice(0, 100);
+  }
+  if (r.powers !== undefined) {
+    const known = new Set([
+      ...def.powers.map((x) => x.key),
+      ...def.classes.flatMap((c) => c.powers.map((x) => `${c.key}:${x.key}`)),
+    ]);
+    const bad = r.powers.find((k) => !known.has(k));
+    if (bad) throw new FormulaError(`Poder desconhecido: ${bad}`);
+    v.powers = r.powers.slice(0, 60);
+  }
   return v;
 }
 
@@ -193,6 +459,16 @@ function ctxFor(def: SystemDefinition, v: SystemValues): FormulaContext {
       return v.attributes[k] ?? 0;
     },
     field: (k) => v.fields[k],
+    gear: (k) => {
+      if (k === 'defense') return v.protections.reduce((s, p) => s + p.defense, 0);
+      if (k === 'spaces')
+        return (
+          v.weapons.reduce((s, w) => s + w.spaces, 0) +
+          v.protections.reduce((s, p) => s + p.spaces, 0) +
+          v.otherSpaces
+        );
+      throw new FormulaError(`gear: valor desconhecido ${k}`);
+    },
   };
 }
 
@@ -261,7 +537,10 @@ export function buildCheck(
 }
 
 /** Teste de Iniciativa pela regra do sistema (perícia/atributo configurados). */
-export function buildInitiative(def: SystemDefinition, v: SystemValues): { expression: string; label: string } {
+export function buildInitiative(
+  def: SystemDefinition,
+  v: SystemValues,
+): { expression: string; label: string } {
   const ini = def.initiative;
   if (ini?.skill) return buildCheck(def, v, { skill: ini.skill });
   if (ini?.attribute) return buildCheck(def, v, { attribute: ini.attribute });

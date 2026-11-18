@@ -9,6 +9,24 @@
 
 ---
 
+## 18/11/2026 — Arsenal, rituais, habilidades e bestiário (Ordem Paranormal)
+
+**O que funciona (testado):**
+- **Armas e proteções na ficha:** escolha entre as 37 armas do livro ou crie uma arma própria. Proteções já somam na Defesa. A carga (5 × Força) avisa quando o personagem está sobrecarregado.
+- **Atacar na mesa:** o botão **Atacar** rola Luta ou Pontaria e, em seguida, o dano. O crítico é detectado e multiplica os dados. Armas de arremesso têm o botão **Arremessar**.
+- **Rituais:** são 82 rituais, com filtro por círculo e elemento. A ficha mostra custo, execução, alcance, alvo, duração e resistência.
+- **Conjurar:** o botão **Conjurar** (também nas formas Discente e Verdadeiro) desconta PE e respeita o limite por turno. Ele rola o custo paranormal (Ocultismo, DT 20 + custo) e tira SAN se falhar; rituais de Medo tiram SAN direto. Também rola o dano ou a cura do ritual quando o livro dá o dado.
+- **Habilidades:** a ficha mostra a tabela da classe por NEX (o que já foi liberado fica aceso), a escolha de trilha com as habilidades de 10/40/65/99%, os poderes de classe e os poderes paranormais.
+- **Bestiário:** no combate, o mestre escolhe entre 49 criaturas do livro. Elas entram com PV, Iniciativa e ataques, e o mestre vê a Defesa e um botão de ataque para cada golpe.
+- **Página do livro:** cada item tem um link "p. X" que abre a página no livro enviado.
+
+**Testes:** rules-engine 53, shared 8, banco 43, API 70 e ponta a ponta 34, todos passando, além de lint e typecheck sem erros.
+
+**Ainda não feito:**
+- Ameaças mundanas (bandido, policial…) no bestiário; por enquanto entram como "Inimigo".
+- SAN máxima reduzida por perda permanente.
+- Efeito automático de cada habilidade (por enquanto: nome, NEX e página).
+
 ## 17/11/2026 — Combate na mesa
 
 **O que funciona (testado):**

@@ -1,6 +1,7 @@
 export * from './dice';
 export * from './expr';
 export * from './system';
+export * from './actions';
 export { ORDEM_PARANORMAL } from './systems/ordem-paranormal';
 
 import type { SystemDefinition } from './system';

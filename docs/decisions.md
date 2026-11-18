@@ -71,6 +71,40 @@ Formato: cada decisão tem contexto, escolha e motivo. "Pendente" = precisa da s
 
 **ADR-030 — Campanhas usam a versão atual do modelo de sistema.** Sistemas criados a partir de um modelo (ex.: Ordem Paranormal) ainda não têm editor próprio. Por isso, a campanha lê a definição atual do modelo, e não a cópia guardada na criação. Assim, novas regras extraídas do livro (como condições e Iniciativa) chegam às campanhas que já existem. Quando houver editor de sistema, uma versão editada passará a ser usada no lugar do modelo.
 
+**ADR-031 — Arsenal, rituais, habilidades e bestiário de Ordem Paranormal (migration 0007).**
+
+*Origem dos dados*
+- Os dados vêm do livro v1.3 por extração automática, com conferência por amostragem: 37 armas, 3 proteções, 82 rituais, progressão das 3 classes, 15 trilhas, poderes de classe, 23 poderes paranormais e 49 criaturas.
+- Guardamos só a mecânica e a página. O texto descritivo é lido no PDF do próprio mestre (regra 1 e regra 7).
+
+*Correções manuais*
+- Nomes de criaturas quebrados em duas linhas foram juntados.
+- As trilhas do Ocultista, cuja página tem diagramação misturada, foram digitadas.
+- Linhas da tabela do Especialista e do Ocultista que ocupavam duas linhas foram completadas.
+- O VD do Estrangeiro foi preenchido.
+- As ameaças mundanas (p. 294–299) ficaram de fora porque a extração não foi confiável. O mestre as adiciona como "Inimigo".
+
+*Ataques (p. 64)*
+- Corpo a corpo usa Luta e soma Força ao dano.
+- Disparo e arma de fogo usam Pontaria, sem atributo no dano.
+- Arremesso usa Pontaria e soma Força ao dano.
+- O crítico vale quando o d20 que contou atinge a margem da arma, e multiplica só os dados.
+- O acerto contra a Defesa fica a cargo da mesa.
+
+*Rituais (p. 129–131)*
+- O custo é de 1, 3, 6 ou 10 PE conforme o círculo, mais o extra das formas discente e verdadeiro.
+- O servidor recusa o ritual se o custo passar do limite de PE por turno ou se faltar PE.
+- DT = 10 + limite de PE + Presença.
+- Custo paranormal: teste de Ocultismo contra DT 20 + custo. Se falhar, o personagem perde SAN igual ao custo.
+- Rituais de Medo tiram SAN automaticamente. A perda permanente é apenas avisada, porque a ficha ainda não guarda SAN máxima reduzida.
+
+*Equipamento e criaturas*
+- Defesa e carga usam a nova função de fórmula `gear()`: soma das proteções e espaços ocupados.
+- Carga = 5 × Força, ou 2 com Força 0 (p. 63).
+- Criaturas entram no combate com PV e Iniciativa da ficha.
+- O ataque da criatura usa o teste e o dano da ficha. O crítico é no 20 natural, com o dobro dos dados.
+- Defesa e ataques da criatura aparecem só para o mestre.
+
 ## Decisões pendentes (preciso da sua escolha)
 
 ### D-01 — Provedor principal de IA (LLM)

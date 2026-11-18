@@ -66,6 +66,8 @@ export interface CampaignSystemDto {
   /** Definição completa (validada pelo motor de regras). */
   definition: unknown;
   hasBook: boolean;
+  /** Livro pronto para consulta (abrir páginas citadas pelas regras). */
+  bookId: string | null;
 }
 
 export interface RuleSearchHitDto {

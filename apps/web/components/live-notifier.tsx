@@ -26,7 +26,12 @@ export function LiveSessionNotifier() {
   return (
     <div className="fixed bottom-4 right-4 z-50 flex w-[min(92vw,360px)] flex-col gap-2">
       {events.map((e) => (
-        <div key={e.campaignId} role="status" data-testid="live-toast" className="animate-rise rounded-xl border border-blood/50 bg-surface/95 p-4 shadow-[0_20px_50px_-20px_rgba(180,35,47,0.6)] backdrop-blur">
+        <div
+          key={e.campaignId}
+          role="status"
+          data-testid="live-toast"
+          className="animate-rise rounded-xl border border-blood/50 bg-surface/95 p-4 shadow-[0_20px_50px_-20px_rgba(180,35,47,0.6)] backdrop-blur"
+        >
           <div className="mb-2 flex items-start gap-3">
             <span className="relative mt-1.5 flex size-2.5">
               <span className="absolute inline-flex size-full animate-ping rounded-full bg-blood opacity-70" />
@@ -39,12 +44,20 @@ export function LiveSessionNotifier() {
                 {e.session.title ? ` — ${e.session.title}` : ''}
               </p>
             </div>
-            <button type="button" aria-label="Fechar aviso" className="text-ink-faint hover:text-ink" onClick={() => setEvents((l) => l.filter((x) => x !== e))}>
+            <button
+              type="button"
+              aria-label="Fechar aviso"
+              className="text-ink-faint hover:text-ink"
+              onClick={() => setEvents((l) => l.filter((x) => x !== e))}
+            >
               <X className="size-4" />
             </button>
           </div>
           <Button asChild size="sm" className="w-full">
-            <Link href={`/campaigns/${e.campaignId}`} onClick={() => setEvents((l) => l.filter((x) => x !== e))}>
+            <Link
+              href={`/campaigns/${e.campaignId}`}
+              onClick={() => setEvents((l) => l.filter((x) => x !== e))}
+            >
               Entrar na mesa
             </Link>
           </Button>

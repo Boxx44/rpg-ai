@@ -4,6 +4,7 @@
  * Permite: números, + - * /, parênteses, comparações (> < >= <= == !=), e as funções
  *   attr("VIG")             valor de um atributo
  *   field("nex")            valor numérico de um campo da ficha
+ *   gear("defense")         soma do equipamento (defense = Defesa das proteções, spaces = espaços ocupados)
  *   lookup("classe", "combatente", 20, "especialista", 16, ..., padrão?)
  *   min(a, b, ...)  max(a, b, ...)  floor(x)  ceil(x)  round(x)  if(cond, a, b)
  *
@@ -28,9 +29,11 @@ type Node =
 export interface FormulaContext {
   attr(key: string): number;
   field(key: string): number | string | undefined;
+  /** Equipamento: gear("defense") soma das proteções, gear("spaces") espaços ocupados. */
+  gear?(key: string): number;
 }
 
-const FUNCTIONS = new Set(['attr', 'field', 'lookup', 'min', 'max', 'floor', 'ceil', 'round', 'if']);
+const FUNCTIONS = new Set(['attr', 'field', 'gear', 'lookup', 'min', 'max', 'floor', 'ceil', 'round', 'if']);
 const MAX_LEN = 500;
 const MAX_DEPTH = 40;
 
@@ -190,6 +193,8 @@ function evalNode(n: Node, ctx: FormulaContext): number | string {
       switch (n.fn) {
         case 'attr':
           return ctx.attr(str(0));
+        case 'gear':
+          return ctx.gear ? ctx.gear(str(0)) : 0;
         case 'field': {
           const v = ctx.field(str(0));
           return v === undefined || v === '' ? 0 : v;

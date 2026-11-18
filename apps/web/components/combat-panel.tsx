@@ -102,6 +102,8 @@ function CombatantRow({
   conditions,
   call,
   busy,
+  campaignId,
+  onOpenPage,
 }: {
   c: CombatantDto;
   current: boolean;
@@ -109,7 +111,27 @@ function CombatantRow({
   conditions: SystemDefinition['conditions'];
   call: (path: string, init?: RequestInit) => Promise<boolean>;
   busy: boolean;
+  campaignId: string;
+  onOpenPage?: (n: number) => void;
 }) {
+  const [atkBusy, setAtkBusy] = useState<number | null>(null);
+  const [atkNote, setAtkNote] = useState<string>();
+  async function creatureAttack(i: number) {
+    setAtkBusy(i);
+    setAtkNote(undefined);
+    try {
+      const r = await api<{ critical: boolean; notes: string[] }>(
+        `/campaigns/${campaignId}/combat/combatants/${c.id}/attack`,
+        await accessToken(),
+        { method: 'POST', body: json({ attack: i }) },
+      );
+      setAtkNote([r.critical ? 'Crítico!' : '', ...r.notes].filter(Boolean).join(' ') || undefined);
+    } catch (e) {
+      setAtkNote(e instanceof Error ? e.message : 'Erro');
+    } finally {
+      setAtkBusy(null);
+    }
+  }
   const [amount, setAmount] = useState('');
   const [ini, setIni] = useState('');
   const base = `/combatants/${c.id}`;
@@ -160,6 +182,43 @@ function CombatantRow({
           </Button>
         )}
       </div>
+      {manager && c.creature && (
+        <div
+          className="space-y-1 rounded-md border border-line/70 bg-surface/60 px-2 py-1.5 text-xs"
+          data-testid="creature-info"
+        >
+          <p className="flex flex-wrap items-center gap-x-3 text-ink-muted">
+            {c.creature.defesa !== null && <span>Defesa {c.creature.defesa}</span>}
+            {c.creature.vd !== null && <span>VD {c.creature.vd}</span>}
+            {c.creature.page && (
+              <button
+                type="button"
+                className="text-arcane-300 hover:text-arcane-200"
+                onClick={() => onOpenPage?.(c.creature!.page!)}
+              >
+                ficha completa: p. {c.creature.page}
+              </button>
+            )}
+          </p>
+          <div className="flex flex-wrap gap-1">
+            {c.creature.attacks.map((a, i) => (
+              <Button
+                key={a.name}
+                size="sm"
+                variant="secondary"
+                loading={atkBusy === i}
+                disabled={atkBusy !== null}
+                onClick={() => creatureAttack(i)}
+                aria-label={`${c.name} ataca com ${a.name}`}
+              >
+                <Swords /> {a.name}
+                {a.times > 1 ? ` x${a.times}` : ''} · {a.damage}
+              </Button>
+            ))}
+          </div>
+          {atkNote && <p className="text-gold-bright">{atkNote}</p>}
+        </div>
+      )}
       {pct !== null && (
         <div className="h-1.5 overflow-hidden rounded-full bg-line">
           <div
@@ -300,14 +359,17 @@ function AddCombatant({
   npcs,
   call,
   busy,
+  creatures,
 }: {
   npcs: NpcDto[];
   call: (p: string, i?: RequestInit) => Promise<boolean>;
   busy: boolean;
+  creatures: SystemDefinition['creatures'];
 }) {
-  const [kind, setKind] = useState<'enemy' | 'npc'>('enemy');
+  const [kind, setKind] = useState<'enemy' | 'npc' | 'creature'>('enemy');
   const [name, setName] = useState('');
   const [npcId, setNpcId] = useState('');
+  const [creatureKey, setCreatureKey] = useState('');
   const [hp, setHp] = useState('');
   const [count, setCount] = useState('1');
   const [hidden, setHidden] = useState(false);
@@ -317,9 +379,11 @@ function AddCombatant({
       onSubmit={async (e) => {
         e.preventDefault();
         const body =
-          kind === 'enemy'
-            ? { kind, name, hp: Number(hp) || 0, count: Number(count) || 1, hidden }
-            : { kind, npcId, hp: Number(hp) || 0, hidden };
+          kind === 'creature'
+            ? { kind, creatureKey, count: Number(count) || 1, hidden }
+            : kind === 'enemy'
+              ? { kind, name, hp: Number(hp) || 0, count: Number(count) || 1, hidden }
+              : { kind, npcId, hp: Number(hp) || 0, hidden };
         if (await call('/combatants', { method: 'POST', body: json(body) })) {
           setName('');
           setHp('');
@@ -331,14 +395,37 @@ function AddCombatant({
       <div className="flex flex-wrap gap-2">
         <Select
           value={kind}
-          onChange={(e) => setKind(e.target.value as 'enemy' | 'npc')}
+          onChange={(e) => setKind(e.target.value as 'enemy' | 'npc' | 'creature')}
           aria-label="Tipo de combatente"
-          className="h-9 w-32"
+          className="h-9 w-40"
         >
           <option value="enemy">Inimigo</option>
+          {creatures.length > 0 && <option value="creature">Criatura do livro</option>}
           {npcs.length > 0 && <option value="npc">NPC</option>}
         </Select>
-        {kind === 'enemy' ? (
+        {kind === 'creature' ? (
+          <Select
+            value={creatureKey}
+            onChange={(e) => setCreatureKey(e.target.value)}
+            aria-label="Criatura"
+            className="h-9 min-w-0 flex-1"
+            required
+          >
+            <option value="">Escolha a criatura</option>
+            {['sangue', 'morte', 'conhecimento', 'energia', 'medo'].map((el) => {
+              const list = creatures.filter((c) => c.element === el);
+              return list.length ? (
+                <optgroup key={el} label={el[0]!.toUpperCase() + el.slice(1)}>
+                  {list.map((c) => (
+                    <option key={c.key} value={c.key}>
+                      {c.name} — VD {c.vd ?? '?'}, {c.pv} PV
+                    </option>
+                  ))}
+                </optgroup>
+              ) : null;
+            })}
+          </Select>
+        ) : kind === 'enemy' ? (
           <Input
             value={name}
             onChange={(e) => setName(e.target.value)}
@@ -366,15 +453,17 @@ function AddCombatant({
         )}
       </div>
       <div className="flex flex-wrap items-center gap-2">
-        <Input
-          value={hp}
-          onChange={(e) => setHp(e.target.value.replace(/\D/g, ''))}
-          placeholder="PV"
-          aria-label="PV do combatente"
-          inputMode="numeric"
-          className="h-9 w-20"
-        />
-        {kind === 'enemy' && (
+        {kind !== 'creature' && (
+          <Input
+            value={hp}
+            onChange={(e) => setHp(e.target.value.replace(/\D/g, ''))}
+            placeholder="PV"
+            aria-label="PV do combatente"
+            inputMode="numeric"
+            className="h-9 w-20"
+          />
+        )}
+        {kind !== 'npc' && (
           <Input
             value={count}
             onChange={(e) => setCount(e.target.value.replace(/\D/g, ''))}
@@ -404,6 +493,7 @@ export function CombatPanel({
   system,
   npcs,
   onChange,
+  onOpenPage,
 }: {
   campaignId: string;
   combat: EncounterDto | null;
@@ -411,6 +501,7 @@ export function CombatPanel({
   system: CampaignSystemDto | null;
   npcs: NpcDto[];
   onChange: Setter;
+  onOpenPage?: (n: number) => void;
 }) {
   const { call, busy, error } = useCombatApi(campaignId, onChange);
   const def = system?.definition as SystemDefinition | undefined;
@@ -488,10 +579,12 @@ export function CombatPanel({
               conditions={conditions}
               call={call}
               busy={busy}
+              campaignId={campaignId}
+              onOpenPage={onOpenPage}
             />
           ))}
         </ol>
-        {manager && <AddCombatant npcs={npcs} call={call} busy={busy} />}
+        {manager && <AddCombatant npcs={npcs} call={call} busy={busy} creatures={def?.creatures ?? []} />}
         {def?.initiative?.page && (
           <p className="text-xs text-ink-faint">
             Iniciativa: teste da perícia, rolado no servidor (livro, p. {def.initiative.page}). A ordem vale

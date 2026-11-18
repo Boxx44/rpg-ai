@@ -336,7 +336,13 @@ export class SystemsService {
 
   async campaignSystemTx(tx: Tx, cid: string): Promise<CampaignSystemDto | null> {
     const [row] = await tx
-      .select({ versionId: v.id, definition: v.definition, systemId: s.id, name: s.name, templateId: s.templateId })
+      .select({
+        versionId: v.id,
+        definition: v.definition,
+        systemId: s.id,
+        name: s.name,
+        templateId: s.templateId,
+      })
       .from(schema.campaigns)
       .innerJoin(v, eq(v.id, schema.campaigns.systemVersionId))
       .innerJoin(s, eq(s.id, v.systemId))
@@ -352,7 +358,7 @@ export class SystemsService {
       .from(d)
       .where(and(eq(d.systemId, row.systemId), eq(d.status, 'ready'), isNull(d.deletedAt)))
       .limit(1);
-    return { ...rest, hasBook: !!book };
+    return { ...rest, hasBook: !!book, bookId: book?.id ?? null };
   }
 
   setCampaignSystem(userId: string, cid: string, systemId: string | null, ctx: RequestCtx) {

@@ -88,6 +88,38 @@ export const characterSheetSchema = z.object({
       fields: z.record(z.union([z.string().max(120), z.number()])).default({}),
       skills: z.record(z.string().max(40)).default({}),
       current: z.record(z.number().int()).default({}),
+      /** Armas, proteções, rituais e poderes: validados no servidor contra o sistema. */
+      weapons: z
+        .array(
+          z.object({
+            ref: z.string().max(40).optional(),
+            name: z.string().max(60).optional(),
+            kind: z.enum(['melee', 'ranged']).optional(),
+            ranged: z.enum(['arremesso', 'disparo', 'fogo']).optional(),
+            damage: z.string().max(20).optional(),
+            critRange: z.number().int().optional(),
+            critMult: z.number().int().optional(),
+            damageType: z.string().max(30).optional(),
+            spaces: z.number().int().optional(),
+            attackBonus: z.number().int().optional(),
+          }),
+        )
+        .max(30)
+        .optional(),
+      protections: z
+        .array(
+          z.object({
+            ref: z.string().max(40).optional(),
+            name: z.string().max(60).optional(),
+            defense: z.number().int().optional(),
+            spaces: z.number().int().optional(),
+          }),
+        )
+        .max(5)
+        .optional(),
+      otherSpaces: z.number().int().optional(),
+      rituals: z.array(z.string().max(40)).max(100).optional(),
+      powers: z.array(z.string().max(90)).max(60).optional(),
     })
     .optional(),
 });
@@ -354,12 +386,22 @@ export const addCombatantSchema = z.discriminatedUnion('kind', [
     kind: z.literal('enemy'),
     name: z.string().trim().min(1).max(80),
     hp: z.number().int().min(0).max(99999).default(0),
-    color: z.string().regex(/^#[0-9a-fA-F]{6}$/).default('#b4232f'),
+    color: z
+      .string()
+      .regex(/^#[0-9a-fA-F]{6}$/)
+      .default('#b4232f'),
     hidden: z.boolean().default(false),
     /** Quantos iguais criar (ex.: 3 zumbis → "Zumbi 1", "Zumbi 2"...). */
     count: z.number().int().min(1).max(12).default(1),
   }),
+  z.object({
+    kind: z.literal('creature'),
+    creatureKey: z.string().regex(/^[a-z0-9_]{1,40}$/),
+    hidden: z.boolean().default(false),
+    count: z.number().int().min(1).max(12).default(1),
+  }),
 ]);
+export const creatureAttackSchema = z.object({ attack: z.number().int().min(0).max(9) });
 export type AddCombatantInput = z.infer<typeof addCombatantSchema>;
 
 export const updateCombatantSchema = z
@@ -401,6 +443,14 @@ export interface CombatantDto {
   hp: { current: number; max: number } | null;
   /** O usuário pode rolar Iniciativa / passar o turno por este combatente. */
   mine: boolean;
+  /** Ficha do livro (só para o mestre). */
+  creature?: {
+    key: string;
+    defesa: number | null;
+    vd: number | null;
+    page?: number;
+    attacks: { name: string; times: number; test: string; damage: string; type: string }[];
+  } | null;
 }
 
 export interface EncounterDto {
@@ -410,4 +460,24 @@ export interface EncounterDto {
   currentId: string | null;
   hiddenTurn: boolean;
   combatants: CombatantDto[];
+}
+
+// ───────────── Ataques e rituais ─────────────
+export const attackSchema = z.object({
+  weapon: z.number().int().min(0).max(29),
+  mode: z.enum(['melee', 'ranged', 'thrown']).optional(),
+  bonus: z.number().int().min(-50).max(50).default(0),
+  damageBonus: z.number().int().min(-50).max(100).default(0),
+  visibility: z.enum(['public', 'gm']).default('public'),
+});
+export const castSchema = z.object({
+  ritual: z.string().max(40),
+  form: z.enum(['basic', 'discente', 'verdadeiro']).default('basic'),
+  visibility: z.enum(['public', 'gm']).default('public'),
+});
+export interface ActionResultDto {
+  messages: ChatMessageDto[];
+  notes: string[];
+  critical?: boolean;
+  character?: CharacterDto;
 }

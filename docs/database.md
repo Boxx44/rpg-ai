@@ -174,6 +174,11 @@ O restante (regras extraídas, sessões, combate, memória, IA) entra nas fases 
 - Funções: `combat_order` (ordem dos turnos), `set_initiative` (mestre ou dono do personagem) e `advance_turn` (mestre ou dono do personagem da vez; recusa clique repetido com erro 40001).
 - RLS: membros leem o combate; ocultos só para o mestre; escrita direta só do mestre.
 
+## Criaturas no combate (migration `0007_creatures.sql`)
+
+- `combatants.creature_key`: qual ficha do bestiário do sistema originou o combatente (PV, Iniciativa e ataques vêm da definição do sistema).
+- A ficha do personagem (`characters.sheet.system`) ganhou armas, proteções, espaços de outros itens, rituais aprendidos e poderes. O servidor valida tudo contra o sistema da campanha, e não houve mudança de tabela para isso.
+
 ## Backups
 
 Supabase Pro: backups diários (ponto no tempo opcional, pago à parte). Além disso: dump lógico semanal para armazenamento externo e teste de restauração trimestral (Fase 9).

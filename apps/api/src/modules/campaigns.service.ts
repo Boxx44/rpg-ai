@@ -56,7 +56,10 @@ export class CampaignsService {
       .innerJoin(m, and(eq(m.campaignId, c.id), eq(m.userId, userId)))
       .leftJoin(schema.systemVersions, eq(schema.systemVersions.id, c.systemVersionId))
       .leftJoin(schema.rpgSystems, eq(schema.rpgSystems.id, schema.systemVersions.systemId))
-      .leftJoin(schema.sessions, and(eq(schema.sessions.campaignId, c.id), eq(schema.sessions.status, 'live')))
+      .leftJoin(
+        schema.sessions,
+        and(eq(schema.sessions.campaignId, c.id), eq(schema.sessions.status, 'live')),
+      )
       .where(and(isNull(c.deletedAt), id ? eq(c.id, id) : undefined))
       .orderBy(desc(c.updatedAt));
     return rows.map(({ systemId, systemName, liveSessionId, liveSessionNumber, liveSessionTitle, ...r }) => ({

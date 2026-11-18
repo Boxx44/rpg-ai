@@ -110,3 +110,56 @@ test('na mesa: ficha rápida, rolagem na crônica e busca de regras no livro', a
     1,
   );
 });
+
+test('arsenal: arma, proteção, trilha e ritual na ficha; atacar e conjurar na mesa', async () => {
+  const campaignPath = (globalThis as { campaignPath?: string }).campaignPath!;
+  await page.goto(`${campaignPath}/characters`);
+  await page.getByTestId('character-card').filter({ hasText: 'Arthur Cervero' }).click();
+  await page.getByLabel('Adicionar arma').selectOption('katana');
+  await page.getByLabel('Adicionar proteção').selectOption('leve');
+  await expect(page.getByTestId('weapon-row')).toContainText('Katana');
+  await expect(page.getByTestId('derived-defesa')).toContainText('18');
+  await expect(page.getByTestId('carga')).toContainText('Carga: 4/');
+  await page.getByLabel('Trilha').selectOption({ label: 'Guerreiro' });
+  await expect(page.getByTestId('trail-abilities')).toContainText('Técnica Letal');
+  await page.getByLabel('Aprender ritual').selectOption('eletrocussao');
+  await expect(page.getByTestId('ritual-card')).toContainText('Eletrocussão');
+  await page.screenshot({ path: 'test-results/screens/ordem-arsenal.png', fullPage: true });
+  await page.getByRole('button', { name: 'Salvar ficha' }).click();
+  await expect(page.getByTestId('character-card').filter({ hasText: 'Arthur Cervero' })).toBeVisible();
+
+  await page.goto(campaignPath);
+  await page.getByRole('tab', { name: 'Ficha' }).click();
+  await page.getByRole('button', { name: 'Atacar com Katana' }).click();
+  await page.getByRole('button', { name: 'Conjurar Eletrocussão' }).click();
+  await expect(page.getByRole('button', { name: 'Conjurar Eletrocussão' })).toBeEnabled();
+  await page.getByRole('tab', { name: 'Crônica' }).click();
+  await expect(
+    page.getByTestId('chat-message').filter({ hasText: 'Arthur Cervero: Katana: ataque' }),
+  ).toHaveCount(1);
+  await expect(page.getByTestId('chat-message').filter({ hasText: /Arthur Cervero: dano/ })).toHaveCount(1);
+  await expect(page.getByTestId('chat-message').filter({ hasText: 'conjura Eletrocussão' })).toHaveCount(1);
+  await expect(page.getByTestId('chat-message').filter({ hasText: 'custo paranormal' })).toHaveCount(1);
+});
+
+test('bestiário: mestre coloca criatura do livro e ataca com ela', async () => {
+  await page.getByRole('tab', { name: /Combate/ }).click();
+  await page.getByRole('button', { name: 'Iniciar combate' }).click();
+  await page.getByLabel('Tipo de combatente').selectOption('creature');
+  await page.getByLabel('Criatura').selectOption('zumbi_de_sangue');
+  await page.getByRole('button', { name: 'Adicionar' }).click();
+  const info = page.getByTestId('creature-info');
+  await expect(info).toContainText('Defesa 17');
+  await expect(page.locator('[data-testid="combatant"][data-name="Zumbi de Sangue"]')).toContainText(
+    '45/45 PV',
+  );
+  await page.getByRole('button', { name: 'Zumbi de Sangue ataca com Garras' }).click();
+  await info.getByRole('button', { name: 'ficha completa: p. 212' }).click();
+  // O livro de teste só tem 4 páginas: basta conferir que a aba de regras abriu.
+  await expect(page.getByRole('tab', { name: 'Regras' })).toHaveAttribute('aria-selected', 'true');
+  await page.getByRole('tab', { name: 'Crônica' }).click();
+  await expect(page.getByTestId('chat-message').filter({ hasText: 'Zumbi de Sangue: Garras' })).toHaveCount(
+    1,
+  );
+  await page.screenshot({ path: 'test-results/screens/bestiary.png', fullPage: true });
+});

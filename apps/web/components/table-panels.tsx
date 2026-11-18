@@ -1,14 +1,21 @@
 'use client';
 
 import type { SystemDefinition } from '@rpg-ai/rules-engine';
-import type { CampaignSystemDto, CharacterDto, DocumentPageDto, RuleSearchHitDto } from '@rpg-ai/shared';
+import type {
+  ActionResultDto,
+  CampaignSystemDto,
+  CharacterDto,
+  DocumentPageDto,
+  RuleSearchHitDto,
+} from '@rpg-ai/shared';
 import { Alert, Button, cn, GameIcon, Input, Select } from '@rpg-ai/ui';
 import { ArrowLeft, ChevronLeft, ChevronRight, Dices, Minus, Plus, Search } from 'lucide-react';
 import Link from 'next/link';
-import { Fragment, useState } from 'react';
+import { Fragment, useEffect, useState } from 'react';
 import { api, json } from '@/lib/api';
 import { accessToken } from '@/lib/supabase';
 import { QuickReference } from './system-panels';
+import { GearSection, RitualsSection } from './system-extras';
 import { normalizeValues, safeCompute } from './system-sheet';
 
 /** Destaca os trechos marcados com « » pela busca. */
@@ -33,10 +40,13 @@ export function RulesPanel({
   campaignId,
   system,
   manager,
+  openPage,
 }: {
   campaignId: string;
   system: CampaignSystemDto | null;
   manager: boolean;
+  /** Pedido externo para abrir uma página do livro (ex.: "p. 141" de um ritual). */
+  openPage?: { page: number; nonce: number } | null;
 }) {
   const [q, setQ] = useState('');
   const [hits, setHits] = useState<RuleSearchHitDto[] | null>(null);
@@ -44,6 +54,11 @@ export function RulesPanel({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string>();
   const def = system?.definition as SystemDefinition | undefined;
+  const bookId = system?.bookId;
+  useEffect(() => {
+    if (openPage && bookId) void open(bookId, openPage.page);
+    // reage só a um novo pedido (nonce)
+  }, [openPage?.nonce, bookId]);
 
   if (!system)
     return (
@@ -203,6 +218,7 @@ export function QuickSheetPanel({
   myId,
   manager,
   onUpdated,
+  onOpenPage,
 }: {
   campaignId: string;
   system: CampaignSystemDto | null;
@@ -210,6 +226,7 @@ export function QuickSheetPanel({
   myId: string;
   manager: boolean;
   onUpdated: (c: CharacterDto) => void;
+  onOpenPage?: (n: number) => void;
 }) {
   const mine = characters.filter((c) => c.canEdit);
   const [selId, setSelId] = useState<string | undefined>(
@@ -254,6 +271,27 @@ export function QuickSheetPanel({
         { method: 'POST', body: json(body) },
       );
       setNotes(r.notes);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Erro');
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function action(path: 'attack' | 'cast', body: object, key: string) {
+    setBusy(key);
+    setError(undefined);
+    try {
+      const r = await api<ActionResultDto>(
+        `/campaigns/${campaignId}/characters/${ch!.id}/${path}`,
+        await accessToken(),
+        {
+          method: 'POST',
+          body: json(body),
+        },
+      );
+      setNotes([...(r.critical ? ['Acerto crítico! O dano já foi multiplicado.'] : []), ...r.notes]);
+      if (r.character) onUpdated(r.character);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Erro');
     } finally {
@@ -416,6 +454,29 @@ export function QuickSheetPanel({
           })}
         </div>
       </div>
+      {(values.weapons.length > 0 || values.protections.length > 0) && (
+        <GearSection
+          def={def}
+          value={values}
+          set={() => undefined}
+          readOnly
+          busy={busy}
+          onOpenPage={onOpenPage}
+          onAttack={(i, mode) => action('attack', { weapon: i, ...(mode ? { mode } : {}) }, `atk-${i}`)}
+        />
+      )}
+      {values.rituals.length > 0 && (
+        <RitualsSection
+          def={def}
+          value={values}
+          set={() => undefined}
+          readOnly
+          busy={busy}
+          onOpenPage={onOpenPage}
+          dt={computed.derived.find((d) => d.key === 'dt_rituais')?.value}
+          onCast={(key, form) => action('cast', { ritual: key, form }, `cast-${key}-${form}`)}
+        />
+      )}
       {notes.map((n) => (
         <Alert key={n} tone="warning">
           {n}

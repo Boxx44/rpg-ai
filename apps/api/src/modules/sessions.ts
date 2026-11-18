@@ -69,7 +69,10 @@ export class SessionsService {
   live(userId: string, cid: string): Promise<SessionDto | null> {
     return withUser(this.db, userId, async (tx) => {
       await requireMember(tx, cid);
-      const [row] = await tx.select({ id: s.id }).from(s).where(and(eq(s.campaignId, cid), eq(s.status, 'live')));
+      const [row] = await tx
+        .select({ id: s.id })
+        .from(s)
+        .where(and(eq(s.campaignId, cid), eq(s.status, 'live')));
       return row ? ((await this.fetch(tx, cid, row.id))[0] ?? null) : null;
     });
   }
@@ -79,19 +82,35 @@ export class SessionsService {
       await requireManager(tx, cid);
       let id: string;
       try {
-        const r = await tx.execute<{ id: string }>(sql`select app_private.start_session(${cid}::uuid, ${title}) as id`);
+        const r = await tx.execute<{ id: string }>(
+          sql`select app_private.start_session(${cid}::uuid, ${title}) as id`,
+        );
         id = r[0]!.id;
       } catch (e) {
-        if (pgCode(e) === '23505') throw new AppError(ERROR_CODES.CONFLICT, 'Já existe uma sessão ao vivo nesta campanha.', 409);
+        if (pgCode(e) === '23505')
+          throw new AppError(ERROR_CODES.CONFLICT, 'Já existe uma sessão ao vivo nesta campanha.', 409);
         throw e;
       }
-      await audit(tx, ctx, { action: 'session.started', entityType: 'session', entityId: id, campaignId: cid, after: { title } });
-      const [c] = await tx.select({ name: schema.campaigns.name }).from(schema.campaigns).where(eq(schema.campaigns.id, cid));
+      await audit(tx, ctx, {
+        action: 'session.started',
+        entityType: 'session',
+        entityId: id,
+        campaignId: cid,
+        after: { title },
+      });
+      const [c] = await tx
+        .select({ name: schema.campaigns.name })
+        .from(schema.campaigns)
+        .where(eq(schema.campaigns.id, cid));
       const members = await tx
         .select({ id: schema.campaignMembers.userId })
         .from(schema.campaignMembers)
         .where(eq(schema.campaignMembers.campaignId, cid));
-      return { session: (await this.fetch(tx, cid, id))[0]!, campaignName: c?.name ?? '', memberIds: members.map((m) => m.id) };
+      return {
+        session: (await this.fetch(tx, cid, id))[0]!,
+        campaignName: c?.name ?? '',
+        memberIds: members.map((m) => m.id),
+      };
     });
     const event: SessionStartedEvent = { campaignId: cid, campaignName, session };
     // Avisa cada membro onde quer que esteja no site (sala pessoal), não só quem está na mesa.
@@ -124,7 +143,12 @@ export class SessionsService {
       const [cur] = await this.fetch(tx, cid, sid);
       if (!cur || cur.status !== 'live') throw notFound('Sessão ao vivo');
       await tx.execute(sql`select app_private.end_session(${sid}::uuid, ${summary})`);
-      await audit(tx, ctx, { action: 'session.ended', entityType: 'session', entityId: sid, campaignId: cid });
+      await audit(tx, ctx, {
+        action: 'session.ended',
+        entityType: 'session',
+        entityId: sid,
+        campaignId: cid,
+      });
       return (await this.fetch(tx, cid, sid))[0]!;
     });
     this.rt.campaign(cid, WS_EVENTS.sessionEnded, { sessionId: sid });
@@ -134,7 +158,11 @@ export class SessionsService {
   update(userId: string, cid: string, sid: string, input: { title?: string; summary?: string }) {
     return withUser(this.db, userId, async (tx) => {
       await requireManager(tx, cid);
-      const r = await tx.update(s).set(input).where(and(eq(s.id, sid), eq(s.campaignId, cid))).returning({ id: s.id });
+      const r = await tx
+        .update(s)
+        .set(input)
+        .where(and(eq(s.id, sid), eq(s.campaignId, cid)))
+        .returning({ id: s.id });
       if (!r.length) throw notFound('Sessão');
       return (await this.fetch(tx, cid, sid))[0]!;
     });
@@ -164,7 +192,13 @@ export class SessionsController {
   }
   @Post(':sid/end')
   @HttpCode(200)
-  end(@CurrentUser() u: AuthUser, @Param('id') id: string, @Param('sid') sid: string, @Body() b: unknown, @Ctx() ctx: RequestCtx) {
+  end(
+    @CurrentUser() u: AuthUser,
+    @Param('id') id: string,
+    @Param('sid') sid: string,
+    @Body() b: unknown,
+    @Ctx() ctx: RequestCtx,
+  ) {
     return this.svc.end(u.id, campaignId(id), anyId(sid), parse(endSessionSchema, b ?? {}).summary, ctx);
   }
   @Patch(':sid')
