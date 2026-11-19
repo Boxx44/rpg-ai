@@ -3,7 +3,7 @@ import { type CookieOptions, createServerClient } from '@supabase/ssr';
 type CookieList = { name: string; value: string; options: CookieOptions }[];
 import { type NextRequest, NextResponse } from 'next/server';
 
-const PUBLIC_PATHS = ['/login', '/register', '/forgot-password', '/auth/callback'];
+const PUBLIC_PATHS = ['/login', '/register', '/forgot-password', '/auth/callback', '/creditos'];
 const AUTH_ONLY_PATHS = ['/login', '/register', '/forgot-password'];
 
 /**
