@@ -10,8 +10,9 @@ import {
 } from '@rpg-ai/shared';
 import { cn, GameIcon } from '@rpg-ai/ui';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { PROP_LIGHT, PropArt } from './map-props';
-import { useAssetUrls } from '@/lib/assets';
+import { FLAT_PROPS, PROP_LIGHT, PropArt, PropDefs } from './map-props';
+import { TEXTURE_CELLS, type TextureKind, useTextures } from '@/lib/textures';
+import { draggingFiles, imageFrom, useAssetUrls } from '@/lib/assets';
 import { prefersLessMotion } from '@/lib/feedback';
 
 export const CELL = 40;
@@ -34,6 +35,24 @@ export const TERRAIN_STYLE: Record<Terrain, { fill: string; pattern?: string }> 
   dirt: { fill: '#4a3624', pattern: 'p-sand' },
   snow: { fill: '#d9e3ec', pattern: 'p-snow' },
   tile: { fill: '#c9cfd6', pattern: 'p-tile' },
+};
+
+/** Textura realista usada por cada terreno. */
+const TERRAIN_TEXTURE: Partial<Record<Terrain, TextureKind>> = {
+  floor: 'floor',
+  wall: 'brick',
+  door: 'floor',
+  grass: 'grass',
+  tree: 'grass',
+  sand: 'sand',
+  rock: 'rock',
+  wood: 'wood',
+  stone: 'stone',
+  carpet: 'carpet',
+  road: 'road',
+  dirt: 'dirt',
+  snow: 'snow',
+  tile: 'tile',
 };
 
 /** "1,5 m" → distância formatada para N quadrados (ou só os quadrados se não der para converter). */
@@ -71,6 +90,13 @@ export interface MapCanvasProps {
   onUseProp?: (t: TokenDto) => void;
   decorations?: Record<string, TokenDecoration>;
   zoom?: number;
+  /**
+   * Soltar uma imagem do computador no mapa. `target` é a peça sob o mouse
+   * (ou null = fundo do mapa). Sem esta função, o mapa não aceita imagens.
+   */
+  onDropImage?: (file: File, target: TokenDto | null) => void;
+  /** Texto do aviso ao arrastar sobre o fundo / sobre uma peça. */
+  dropHint?: (target: TokenDto | null) => string;
   /** Pinça com dois dedos e botão "ajustar à tela" mudam o zoom. */
   onZoomChange?: (z: number) => void;
   className?: string;
@@ -123,8 +149,17 @@ export function MapCanvas({
   decorations,
   zoom = 1,
   onZoomChange,
+  onDropImage,
+  dropHint,
   className,
 }: MapCanvasProps) {
+  /** Arrastando um arquivo de imagem por cima do mapa: mostra onde vai cair. */
+  const [dropOver, setDropOver] = useState<{ target: TokenDto | null } | null>(null);
+  const tokenAt = (x: number, y: number): TokenDto | null => {
+    const el = document.elementFromPoint(x, y)?.closest('[data-token-id]');
+    const id = el?.getAttribute('data-token-id');
+    return (id && map.tokens.find((t) => t.id === id && !isProp(t))) || null;
+  };
   const svgRef = useRef<SVGSVGElement>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
   /** Dedos na tela (toque): um dedo arrasta a vista, dois dedos dão zoom. */
@@ -153,6 +188,7 @@ export function MapCanvas({
   const [painting, setPainting] = useState<Map<string, { x: number; y: number }> | null>(null);
   const [hover, setHover] = useState<string | null>(null);
   const floaters = useFloaters(decorations);
+  const tex = useTextures();
   const urls = useAssetUrls(map.campaignId, [map.backgroundAsset, ...map.tokens.map((t) => t.image)]);
   const bg = map.backgroundAsset ? urls[map.backgroundAsset] : undefined;
 
@@ -356,7 +392,38 @@ export function MapCanvas({
   const animated = (tr: Terrain) => cells.filter((c) => c.tr === tr);
 
   return (
-    <div className="relative">
+    <div
+      className="relative"
+      onDragOver={
+        onDropImage
+          ? (e) => {
+              if (!draggingFiles(e)) return;
+              e.preventDefault();
+              e.dataTransfer.dropEffect = 'copy';
+              const target = tokenAt(e.clientX, e.clientY);
+              if (dropOver?.target?.id !== target?.id || !dropOver) setDropOver({ target });
+            }
+          : undefined
+      }
+      onDragLeave={
+        onDropImage
+          ? (e) => {
+              if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDropOver(null);
+            }
+          : undefined
+      }
+      onDrop={
+        onDropImage
+          ? (e) => {
+              const f = imageFrom(e.dataTransfer);
+              setDropOver(null);
+              if (!f) return;
+              e.preventDefault();
+              onDropImage(f, tokenAt(e.clientX, e.clientY));
+            }
+          : undefined
+      }
+    >
       <div
         ref={wrapRef}
         className={cn(
@@ -381,6 +448,34 @@ export function MapCanvas({
           onPointerCancel={(e) => onPointerUp(e)}
         >
           <defs>
+            {(Object.keys(tex) as TextureKind[]).map((k) => {
+              const size = CELL * TEXTURE_CELLS[k];
+              return (
+                <pattern key={k} id={`tx-${k}`} width={size} height={size} patternUnits="userSpaceOnUse">
+                  <image href={tex[k]} width={size} height={size} />
+                </pattern>
+              );
+            })}
+            <linearGradient id="g-walltop" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0" stopColor="rgba(0,0,0,0.05)" />
+              <stop offset="1" stopColor="rgba(0,0,0,0.45)" />
+            </linearGradient>
+            <linearGradient id="g-shadow-s" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0" stopColor="rgba(0,0,0,0.6)" />
+              <stop offset="1" stopColor="rgba(0,0,0,0)" />
+            </linearGradient>
+            <linearGradient id="g-shadow-e" x1="0" y1="0" x2="1" y2="0">
+              <stop offset="0" stopColor="rgba(0,0,0,0.45)" />
+              <stop offset="1" stopColor="rgba(0,0,0,0)" />
+            </linearGradient>
+            <radialGradient id="g-depth" cx="50%" cy="50%" r="70%">
+              <stop offset="0" stopColor="rgba(0,20,40,0.35)" />
+              <stop offset="1" stopColor="rgba(0,0,0,0)" />
+            </radialGradient>
+            <filter id="f-shadow" x="-30%" y="-30%" width="160%" height="160%">
+              <feDropShadow dx="2" dy="3" stdDeviation="2" floodColor="#000" floodOpacity="0.55" />
+            </filter>
+            <PropDefs />
             <pattern id="p-floor" width="40" height="40" patternUnits="userSpaceOnUse">
               <rect width="40" height="40" fill="#2a2433" />
               <path d="M0 0H40V40" fill="none" stroke="rgba(0,0,0,0.25)" />
@@ -483,91 +578,69 @@ export function MapCanvas({
             />
           )}
 
-          {/* Terreno */}
+          {/* Terreno (texturas realistas; enquanto carregam, cores lisas) */}
           <g pointerEvents="none">
             {cells.map(({ k, x, y, tr }) => {
               const s = TERRAIN_STYLE[tr];
+              const tk = TERRAIN_TEXTURE[tr];
+              const fill = tk && tex[tk] ? `url(#tx-${tk})` : s.pattern ? `url(#${s.pattern})` : s.fill;
               return (
                 <g key={k} data-terrain={tr}>
-                  <rect
-                    x={x * CELL}
-                    y={y * CELL}
-                    width={CELL}
-                    height={CELL}
-                    fill={s.pattern ? `url(#${s.pattern})` : s.fill}
-                  />
-                  {s.pattern === 'p-sand' && (
-                    <rect
-                      x={x * CELL}
-                      y={y * CELL}
-                      width={CELL}
-                      height={CELL}
-                      fill={s.fill}
-                      opacity="0.85"
-                      style={{ mixBlendMode: 'multiply' }}
-                    />
-                  )}
+                  <rect x={x * CELL} y={y * CELL} width={CELL} height={CELL} fill={fill} />
                   {tr === 'road' && (x + y) % 2 === 0 && (
                     <rect
-                      x={x * CELL + 16}
+                      x={x * CELL + 14}
                       y={y * CELL + 18}
-                      width={8}
+                      width={12}
                       height={3}
-                      fill="#e6c84a"
-                      opacity="0.6"
+                      rx={1}
+                      fill="#d9c25a"
+                      opacity="0.7"
                     />
                   )}
                   {tr === 'door' && (
-                    <g>
+                    <g filter="url(#f-shadow)">
                       <rect
-                        x={x * CELL + 4}
+                        x={x * CELL + 3}
                         y={y * CELL + 15}
-                        width={CELL - 8}
+                        width={CELL - 6}
                         height={10}
                         rx={2}
-                        fill="#7a5230"
-                        stroke="#4a3019"
+                        fill={tex.plank ? 'url(#tx-plank)' : '#7a5230'}
+                        stroke="#3a2412"
                       />
                       <circle cx={x * CELL + CELL - 9} cy={y * CELL + 20} r={1.8} fill="#e6c87f" />
                     </g>
                   )}
-                  {tr === 'tree' && (
-                    <g
-                      className="animate-pulse-soft"
-                      style={{ animationDuration: `${3 + ((x * 7 + y * 3) % 4)}s` }}
-                    >
-                      <circle
-                        cx={x * CELL + CELL / 2 + 3}
-                        cy={y * CELL + CELL / 2 + 4}
-                        r={CELL * 0.42}
-                        fill="rgba(0,0,0,0.35)"
-                      />
-                      <circle
-                        cx={x * CELL + CELL / 2}
-                        cy={y * CELL + CELL / 2}
-                        r={CELL * 0.42}
-                        fill="#2e6b38"
-                        stroke="#173020"
-                      />
-                      <circle
-                        cx={x * CELL + CELL / 2 - 5}
-                        cy={y * CELL + CELL / 2 - 5}
-                        r={CELL * 0.18}
-                        fill="#3f8a4b"
-                      />
-                    </g>
-                  )}
                   {tr === 'wall' && (
                     <>
-                      {/* topo da parede mais claro e sombra no chão abaixo: dá volume */}
-                      <rect x={x * CELL} y={y * CELL} width={CELL} height={4} fill="rgba(255,240,210,0.12)" />
+                      {/* topo da parede: luz de cima e borda escura; sombra projetada no chão (sul e leste) */}
+                      <rect x={x * CELL} y={y * CELL} width={CELL} height={CELL} fill="url(#g-walltop)" />
+                      {!isWall(x, y - 1) && (
+                        <rect
+                          x={x * CELL}
+                          y={y * CELL}
+                          width={CELL}
+                          height={3}
+                          fill="rgba(255,235,200,0.22)"
+                        />
+                      )}
                       {!isWall(x, y + 1) && y + 1 < map.rows && (
                         <rect
                           x={x * CELL}
                           y={(y + 1) * CELL}
                           width={CELL}
-                          height={6}
-                          fill="rgba(0,0,0,0.35)"
+                          height={CELL * 0.45}
+                          fill="url(#g-shadow-s)"
+                        />
+                      )}
+                      {!isWall(x + 1, y) && x + 1 < map.cols && (
+                        <rect
+                          x={(x + 1) * CELL}
+                          y={y * CELL}
+                          width={CELL * 0.3}
+                          height={CELL}
+                          fill="url(#g-shadow-e)"
                         />
                       )}
                     </>
@@ -578,14 +651,15 @@ export function MapCanvas({
             {/* Água e lava se mexendo */}
             {animated('water').length > 0 && (
               <g clipPath="url(#clip-water)">
-                <rect width={W} height={H} fill="#173451" />
+                <rect width={W} height={H} fill={tex.water ? 'url(#tx-water)' : '#173451'} />
                 <rect x={-40} width={W + 80} height={H} fill="url(#p-waves)" className="animate-drift" />
+                <rect width={W} height={H} fill="url(#g-depth)" />
               </g>
             )}
             {animated('lava').length > 0 && (
               <g clipPath="url(#clip-lava)">
-                <rect width={W} height={H} fill="#7a2a10" />
-                <rect width={W} height={H} fill="#ff5a1a" className="animate-pulse-soft" opacity="0.35" />
+                <rect width={W} height={H} fill={tex.lava ? 'url(#tx-lava)' : '#7a2a10'} />
+                <rect width={W} height={H} fill="#ff6a1a" className="animate-pulse-soft" opacity="0.22" />
                 <rect
                   x={-40}
                   width={W + 80}
@@ -593,15 +667,45 @@ export function MapCanvas({
                   fill="url(#p-lava)"
                   className="animate-drift"
                   style={{ animationDuration: '6s' }}
+                  opacity="0.5"
                 />
               </g>
             )}
+            {/* Copas das árvores por cima do chão, com leve balanço */}
+            {cells
+              .filter((c) => c.tr === 'tree')
+              .map(({ k, x, y }) => {
+                const v = (x * 7 + y * 3) % 3;
+                const href = tex[`canopy${v}` as TextureKind];
+                const size = CELL * 1.35;
+                return href ? (
+                  <image
+                    key={`tree-${k}`}
+                    href={href}
+                    x={x * CELL + CELL / 2 - size / 2}
+                    y={y * CELL + CELL / 2 - size / 2}
+                    width={size}
+                    height={size}
+                    className="animate-pulse-soft"
+                    style={{ animationDuration: `${3 + ((x * 7 + y * 3) % 4)}s` }}
+                  />
+                ) : (
+                  <circle
+                    key={`tree-${k}`}
+                    cx={x * CELL + CELL / 2}
+                    cy={y * CELL + CELL / 2}
+                    r={CELL * 0.42}
+                    fill="#2e6b38"
+                    stroke="#173020"
+                  />
+                );
+              })}
           </g>
 
           {/* Grade */}
           <g
             pointerEvents="none"
-            stroke={bg ? 'rgba(255,255,255,0.18)' : 'rgba(201,162,75,0.10)'}
+            stroke={bg ? 'rgba(255,255,255,0.18)' : 'rgba(0,0,0,0.28)'}
             strokeWidth={1}
             display={map.gridVisible === false ? 'none' : undefined}
           >
@@ -653,8 +757,10 @@ export function MapCanvas({
                   {canUse ? ' (clique para usar)' : ''}
                 </title>
                 <rect width={box} height={box} fill="transparent" />
-                <g transform={`rotate(${t.rotation} ${box / 2} ${box / 2}) scale(${box / 100})`}>
-                  <PropArt kind={t.icon!} state={t.state} />
+                <g filter={FLAT_PROPS.includes(t.icon!) ? undefined : 'url(#f-shadow)'}>
+                  <g transform={`rotate(${t.rotation} ${box / 2} ${box / 2}) scale(${box / 100})`}>
+                    <PropArt kind={t.icon!} state={t.state} />
+                  </g>
                 </g>
                 {(hover === t.id || selectedTokenId === t.id) && (
                   <rect
@@ -920,6 +1026,19 @@ export function MapCanvas({
           })}
           <rect width={W} height={H} fill="url(#g-vignette)" pointerEvents="none" />
         </svg>
+        {dropOver && (
+          <div
+            className="pointer-events-none absolute inset-0 z-10 grid place-items-center rounded-xl border-2 border-dashed border-gold bg-bg/55"
+            data-testid="drop-overlay"
+          >
+            <p className="rounded-lg bg-bg/90 px-4 py-2 text-sm text-gold-bright shadow-xl">
+              {dropHint?.(dropOver.target) ??
+                (dropOver.target
+                  ? `Soltar para pôr a imagem em ${dropOver.target.label}`
+                  : 'Soltar para usar como fundo do mapa')}
+            </p>
+          </div>
+        )}
         {drag && !isProp(drag.token) && (
           <div
             className="pointer-events-none absolute left-3 top-3 rounded-md border border-gold/40 bg-bg/90 px-3 py-1.5 text-xs text-gold-bright"
