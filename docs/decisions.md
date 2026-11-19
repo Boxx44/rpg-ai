@@ -292,3 +292,16 @@ _Regras completadas_
 - Os bonecos são SVG gerados por código (`token-figure.tsx`), com aparência sorteada de forma fixa pelo id do token. Não usam imagens de terceiros.
 - A respiração usa animação CSS, que respeita "menos movimento".
 - Os testes rodam com `reducedMotion: 'reduce'`, para os cliques não esperarem animações infinitas.
+
+**ADR-044 — Aparência do personagem como dado da ficha.**
+
+- A aparência (corpo, pele, olhos, cabelo, roupas, calçados, acessórios, item na mão, capuz) fica em `sheet.appearance`, validada por Zod (`packages/shared/src/appearance.ts`). Só aceita opções de listas fechadas e cores `#rrggbb` — nada de texto livre que vire CSS ou SVG.
+- Não precisou de migration: a ficha já é JSON versionado.
+- O boneco (`avatar-figure.tsx`) é desenhado por código, em estilo próprio (visto de cima, contorno escuro, sombra). As imagens de referência enviadas pelo responsável serviram só de direção; nenhuma arte de terceiros foi copiada.
+- Sem aparência escolhida, o boneco é sorteado de forma fixa pelo id do token, e o item na mão vem do equipamento/classe.
+
+**ADR-045 — Recorte de fundo liso no navegador.**
+
+- Ao enviar imagem de token ou retrato, o navegador apaga o fundo se os quatro cantos tiverem a mesma cor (preenchimento a partir das bordas, com borda suave). Fotos com fundo variado ficam intactas.
+- Imagem com transparência vira figura recortada que respira no mapa (`data-figure="cutout"`); sem transparência, continua como "carta" com moldura.
+- Feito no cliente para não gastar servidor; o servidor continua validando tipo e tamanho. Há uma caixa para desligar o recorte.

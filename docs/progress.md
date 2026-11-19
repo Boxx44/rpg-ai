@@ -22,6 +22,21 @@
 
 ---
 
+## 19/11/2026 — Bonecos 2D que respiram e aba Aparência
+
+**O que funciona (testado):**
+
+- **Tokens desenhados em 2D** (vistos de cima, contorno escuro), que respiram e piscam. Inimigos mantêm visuais próprios (zumbi, cultista, capanga, sombra, fera).
+- **Aba "Aparência"** na ficha e um passo "Aparência" na criação guiada:
+  - 4 tipos de corpo, 12 cabelos (com mecha colorida opcional), 8 roupas de cima, 5 de baixo, 4 calçados, 8 acessórios, 9 itens na mão e capuz;
+  - paletas de cores e seletor de qualquer cor;
+  - botão "Aleatório" e pré-visualização animada.
+- **Arte própria:** imagem com fundo liso (branco, cinza…) enviada para token ou retrato tem o fundo apagado e vira figura recortada que respira no mapa.
+
+**Como testar:** abra um personagem → aba "Aparência" → escolha cabelo, roupa e cores → salve → o token no mapa muda. Ou arraste uma arte de corpo inteiro com fundo branco sobre um token.
+
+**Testes:** unidade (db 58, api 92, shared 18, regras 57) e ponta a ponta (54) passando; lint e tipos sem erros.
+
 ## 19/11/2026 — Mapa grande, tokens 2D e segredos no mapa
 
 **O que funciona (testado):**

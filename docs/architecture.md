@@ -291,6 +291,13 @@ Existem hoje: `apps/web`, `apps/api`, `packages/{db,shared,ui,logger,rules-engin
 
 **Fluxo de autenticação implementado:** o navegador faz login no Supabase Auth → recebe um token (JWT) → envia o token à API → a API verifica a assinatura (segredo HS256 ou chaves públicas JWKS) → confirma que a conta existe e está ativa → executa a consulta no banco com o papel do usuário (RLS ativo).
 
+### Bonecos do mapa (web)
+
+- `components/avatar-figure.tsx`: desenha o boneco 2D a partir de `Appearance` (shared).
+- `components/token-figure.tsx`: escolhe entre boneco, figura recortada (imagem com transparência), carta (imagem comum) ou visual de inimigo.
+- `components/appearance-editor.tsx`: editor da aba "Aparência".
+- `lib/assets.ts`: `removeFlatBackground` (recorte no envio) e `useCutouts` (detecta transparência).
+
 ## 8. Dependências externas
 
 | Serviço                                                      | Uso                            | Obrigatório na Fase 1?                            |
