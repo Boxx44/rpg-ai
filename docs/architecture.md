@@ -283,6 +283,12 @@ Existem hoje: `apps/web`, `apps/api`, `packages/{db,shared,ui,logger,rules-engin
   - `combat-stage.tsx` traz `CombatIntro`, a faixa de abertura, e `InitiativeBar`, a barra acima do mapa;
   - `GameTable` compara o combate anterior com o novo para saber se o combate começou, se alguém entrou ou se terminou.
 
+**Celular:**
+
+- `GameTable` guarda a escolha `view` (`map` | `panel`) e mostra a barra `table-bottom-nav` (`xl:hidden`).
+- `MapCanvas` aceita `onZoomChange`, usado pela pinça e pelo botão "Ajustar à tela", e trata toque (arrastar a vista e tocar numa casa) separado do mouse.
+- `DiceTray` e `CombatIntro` ficam fora das seções, com `position: fixed`.
+
 **Fluxo de autenticação implementado:** o navegador faz login no Supabase Auth → recebe um token (JWT) → envia o token à API → a API verifica a assinatura (segredo HS256 ou chaves públicas JWKS) → confirma que a conta existe e está ativa → executa a consulta no banco com o papel do usuário (RLS ativo).
 
 ## 8. Dependências externas

@@ -1,13 +1,48 @@
 # Progresso — RPG AI
 
-| Fase                       | Status                                                                              |
-| -------------------------- | ----------------------------------------------------------------------------------- |
-| 0 — Análise e documentação | ✅ Concluída (17/11/2026)                                                           |
-| 1 — Fundação               | ✅ Concluída localmente (17/11/2026) — falta validar com Supabase real (ver abaixo) |
-| 2 — Importação de PDFs     | ⏳ Próxima                                                                          |
-| 3–9                        | ⬜ Não iniciadas                                                                    |
+| Fase                             | Status                                                                                                               |
+| -------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| 0 — Análise e documentação       | ✅ Concluída                                                                                                         |
+| 1 — Fundação                     | ✅ Concluída (site e banco no ar com Supabase real)                                                                  |
+| 2 — Importação de PDFs           | 🟡 Parcial: envio do livro, texto por página, busca e "abrir página do livro"; falta OCR de páginas digitalizadas    |
+| 3 — Modelo universal + motor     | 🟡 Parcial: Ordem Paranormal completo no motor de regras; extração automática de regras de outros sistemas ainda não |
+| 4 — Fichas dinâmicas             | ✅ Para Ordem Paranormal (criação guiada, ficha completa, biblioteca)                                                |
+| 5 — NPCs e criaturas             | ✅ NPCs com ficha, bestiário do livro e ameaças mundanas                                                             |
+| 6 — Mestre de IA e memória       | ⬜ Não iniciada (precisa de uma chave de IA paga)                                                                    |
+| 7 — Multiplayer                  | ✅ Mesa em tempo real, sessões ao vivo, chat, rolagens                                                               |
+| 8 — Mapas e combate              | ✅ Mapas com objetos, imagens e modelos; iniciativa, turnos, ataques, rituais                                        |
+| 9 — Segurança, testes e produção | 🟡 Testes automáticos e site no ar; faltam teste de carga e rotina de backup                                         |
+| Extra — Celular e acessibilidade | ✅ Mesa adaptada ao celular, preferências de acessibilidade                                                          |
+
+-------------------------- | ----------------------------------------------------------------------------------- |
+| 0 — Análise e documentação | ✅ Concluída (17/11/2026) |
+| 1 — Fundação | ✅ Concluída localmente (17/11/2026) — falta validar com Supabase real (ver abaixo) |
+| 2 — Importação de PDFs | ⏳ Próxima |
+| 3–9 | ⬜ Não iniciadas |
 
 ---
+
+## 19/11/2026 — Mesa no celular
+
+**O que funciona (testado num celular simulado, Pixel 7):**
+
+- **Barra fixa embaixo** na mesa (celular e tablet): Mapa · Crônica · Combate · Ficha · Regras. Mostra uma coisa por vez, ocupando a tela.
+  - A Crônica mostra quantas mensagens novas chegaram.
+  - O Combate ganha um ponto vermelho quando há combate e pisca quando é a sua vez.
+- **Mapa com toque:**
+  - um dedo arrasta a vista;
+  - dois dedos dão zoom (pinça);
+  - um toque rápido numa casa vale como clique;
+  - o botão "Ajustar à tela" faz o mapa caber na largura, e ele já abre assim no celular.
+- **Crônica, Combate, Ficha e Regras** ocupam o espaço entre o topo e a barra de baixo, com o campo de mensagem sempre à vista.
+- Dados rolados e a faixa "Combate!" aparecem em qualquer painel.
+- **Editor de mapas:** o formulário "Novo mapa" fica recolhido num botão, e o mapa aparece logo.
+- **Fichas de personagem e NPC:** os botões Salvar/Cancelar ficam presos embaixo da tela.
+- **Menu da campanha:** rola de lado e deixa a seção atual à vista.
+- Iniciais dos tokens ignoram símbolos: "Arthur (exemplo)" vira "AE".
+- Nenhuma tela tem rolagem para o lado. Isso é verificado automaticamente em 13 telas.
+
+**Testes:** ponta a ponta 48 (incluindo o novo teste da mesa no celular), lint e typecheck sem erros.
 
 ## 18/11/2026 — Imagens, modelos de mapa e entrada em combate
 

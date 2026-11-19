@@ -254,3 +254,10 @@ _Regras completadas_
 - A faixa "Combate!" é só visual: não bloqueia cliques, some sozinha ou com Esc e respeita "menos movimento".
 - A barra de iniciativa usa os dados que o servidor já filtrou, então combatentes ocultos não aparecem para jogadores.
 - Inimigos sem retrato usam a imagem do token de mesmo nome que está no mapa.
+
+**ADR-039 — Mesa no celular com um painel por vez.**
+
+- Abaixo de 1280 px, a mesa troca as duas colunas (mapa + painel lateral) por uma barra fixa embaixo. O painel escolhido ocupa a tela entre o cabeçalho e a barra (`position: fixed`).
+- **Por quê:** empilhar o mapa e o painel obrigava a rolar a página sem parar, e o campo de mensagem ficava escondido.
+- **Gestos do mapa:** implementados com Pointer Events (`touch-action: none` no mapa). Um dedo arrasta a vista e dois dedos dão zoom; o toque sem movimento vira clique.
+- O computador não muda: as abas laterais continuam como eram.
