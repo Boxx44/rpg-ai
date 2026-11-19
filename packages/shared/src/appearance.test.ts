@@ -5,10 +5,10 @@ import { characterSheetSchema } from './game';
 describe('aparência', () => {
   it('preenche o padrão e recusa valores inventados', () => {
     const a = appearanceSchema.parse({ hair: { style: 'longo' } });
-    expect(a).toMatchObject({ body: 'medio', hair: { style: 'longo', streak: null }, held: 'nenhum' });
+    expect(a).toMatchObject({ frame: 'masc', body: 'medio', hair: { style: 'longo', streak: null }, held: 'nenhum' });
     expect(() => appearanceSchema.parse({ hair: { style: 'asa-de-anjo' } })).toThrow();
     expect(() => appearanceSchema.parse({ skin: 'vermelho' })).toThrow();
-    expect(() => appearanceSchema.parse({ accessories: ['caveira', 'oculos', 'venda', 'colar', 'luvas'] })).toThrow();
+    expect(() => appearanceSchema.parse({ accessories: ['caveira', 'oculos', 'venda', 'colar', 'luvas', 'cinto', 'brincos'] })).toThrow();
   });
   it('aparência sorteada é sempre a mesma para a mesma semente e é válida', () => {
     expect(randomAppearance('abc')).toEqual(randomAppearance('abc'));
