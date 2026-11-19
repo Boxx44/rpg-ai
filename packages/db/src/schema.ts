@@ -193,8 +193,21 @@ export const mapTokens = pgTable('map_tokens', {
   state: text('state').$type<'open' | 'closed' | 'on' | 'off'>(),
   rotation: integer('rotation').notNull().default(0),
   imageAsset: uuid('image_asset'),
+  /** Segredo: perícia, dificuldade e alcance (casas) para um jogador descobrir a peça oculta. */
+  secretSkill: text('secret_skill'),
+  secretDt: integer('secret_dt'),
+  secretRadius: integer('secret_radius').notNull().default(2),
   createdAt: ts('created_at').notNull().defaultNow(),
   updatedAt: ts('updated_at').notNull().defaultNow(),
+});
+
+/** Quem descobriu qual peça secreta (gravado só pelo servidor, após a rolagem). */
+export const mapTokenReveals = pgTable('map_token_reveals', {
+  tokenId: uuid('token_id').notNull(),
+  userId: uuid('user_id').notNull(),
+  campaignId: uuid('campaign_id').notNull(),
+  rollTotal: integer('roll_total').notNull(),
+  createdAt: ts('created_at').notNull().defaultNow(),
 });
 
 /** Imagens (fundo de mapa, token, retrato), guardadas já reduzidas. */

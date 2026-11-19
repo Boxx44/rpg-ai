@@ -368,6 +368,14 @@ export const createTokenSchema = z.object({
   icon: z.enum(PROP_KINDS as [PropKind, ...PropKind[]]).optional(),
   rotation: z.union([z.literal(0), z.literal(90), z.literal(180), z.literal(270)]).optional(),
   imageAsset: z.string().uuid().optional(),
+  /** Segredo (só com a peça oculta): perícia, DT e alcance em casas para um jogador descobrir. */
+  secretSkill: z
+    .string()
+    .regex(/^[a-z0-9_]{1,40}$/)
+    .nullable()
+    .optional(),
+  secretDt: z.number().int().min(1).max(60).nullable().optional(),
+  secretRadius: z.number().int().min(0).max(20).optional(),
 });
 export type CreateTokenInput = z.infer<typeof createTokenSchema>;
 
@@ -379,6 +387,14 @@ export const updateTokenSchema = z
     hidden: z.boolean().optional(),
     rotation: z.union([z.literal(0), z.literal(90), z.literal(180), z.literal(270)]).optional(),
     imageAsset: z.string().uuid().nullable().optional(),
+    /** Segredo (só com a peça oculta): perícia, DT e alcance em casas para um jogador descobrir. */
+    secretSkill: z
+      .string()
+      .regex(/^[a-z0-9_]{1,40}$/)
+      .nullable()
+      .optional(),
+    secretDt: z.number().int().min(1).max(60).nullable().optional(),
+    secretRadius: z.number().int().min(0).max(20).optional(),
   })
   .refine((v) => Object.keys(v).length > 0, { message: 'Nenhum campo para atualizar' });
 export type UpdateTokenInput = z.infer<typeof updateTokenSchema>;
@@ -408,6 +424,22 @@ export interface TokenDto {
   imageAsset: string | null;
   /** Imagem a desenhar: a do token ou, se não houver, o retrato do personagem/NPC. */
   image: string | null;
+  /** Segredo (só o mestre recebe): perícia, DT e alcance. */
+  secret?: { skill: string; dt: number; radius: number } | null;
+  /** Mestre: nomes de quem já descobriu. Jogador: true se esta peça foi descoberta por ele. */
+  foundBy?: string[];
+  discovered?: boolean;
+}
+
+/** "Procurar ao redor": rola a perícia do personagem e revela segredos próximos. */
+export const searchAreaSchema = z.object({
+  characterId: z.string().uuid(),
+  skill: z.string().regex(/^[a-z0-9_]{1,40}$/),
+});
+export type SearchAreaInput = z.infer<typeof searchAreaSchema>;
+export interface SearchResultDto {
+  total: number;
+  found: { id: string; label: string }[];
 }
 
 export interface MapSummaryDto {
@@ -438,6 +470,8 @@ export const WS_EVENTS = {
   chatMessage: 'chat.message',
   tokenMoved: 'token.moved',
   propToggled: 'prop.toggled',
+  /** Um jogador descobriu segredos (vai para ele e para o mestre). */
+  secretFound: 'secret.found',
   mapsChanged: 'maps.changed',
   npcsChanged: 'npcs.changed',
   charactersChanged: 'characters.changed',
