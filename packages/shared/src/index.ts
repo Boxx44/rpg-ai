@@ -163,3 +163,4 @@ export * from './systems';
 export * from './assets';
 export * from './map-templates';
 export * from './appearance';
+export * from './lpc';

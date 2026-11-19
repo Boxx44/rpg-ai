@@ -3,6 +3,7 @@
  * calçados, acessórios e item na mão. Validada no servidor dentro da ficha.
  */
 import { z } from 'zod';
+import { pixelSchema } from './lpc';
 
 export const FRAMES = ['fem', 'masc'] as const;
 export const BODY_TYPES = ['magro', 'medio', 'atletico', 'forte', 'largo', 'pesado'] as const;
@@ -103,6 +104,8 @@ export const appearanceSchema = z.object({
   held: z.enum(HELD_ITEMS).default('nenhum'),
   /** Capuz levantado (moletom e manto). */
   hood: z.boolean().default(false),
+  /** Personagem em pixel art (peças LPC). Quando existe, é ele que aparece no mapa. */
+  pixel: pixelSchema.optional(),
 });
 export type Appearance = z.infer<typeof appearanceSchema>;
 
