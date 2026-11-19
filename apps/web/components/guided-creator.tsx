@@ -1,5 +1,7 @@
 'use client';
 
+import type { Appearance } from '@rpg-ai/shared';
+import { AppearanceEditor } from './appearance-editor';
 import { evalFormula, type SystemDefinition, type SystemValues } from '@rpg-ai/rules-engine';
 import { Alert, Button, Card, CardContent, cn, Field, Input, Select } from '@rpg-ai/ui';
 import { ArrowLeft, ArrowRight, Check, Wand2 } from 'lucide-react';
@@ -12,9 +14,11 @@ export interface GuidedResult {
   name: string;
   concept: string;
   values: SystemValues;
+  /** Aparência do boneco 2D escolhida no passo "Aparência". */
+  appearance?: Appearance | null;
 }
 
-const STEPS = ['Conceito', 'Atributos', 'Origem', 'Classe', 'Perícias', 'Equipamento', 'Revisão'] as const;
+const STEPS = ['Conceito', 'Atributos', 'Origem', 'Classe', 'Perícias', 'Equipamento', 'Aparência', 'Revisão'] as const;
 const STEP_KEYS = ['concept', 'attributes', 'origin', 'class', 'skills', 'equipment', 'review'] as const;
 type Focus = { title: string; text: string; page?: number } | null;
 
@@ -62,6 +66,7 @@ export function GuidedCreator({
   const [weapons, setWeapons] = useState<string[]>([]);
   const [protection, setProtection] = useState('');
   const [rituals, setRituals] = useState<string[]>([]);
+  const [appearance, setAppearance] = useState<Appearance | null>(null);
 
   // ── atributos
   const dumped = Object.values(attrs).filter((v) => v === 0).length;
@@ -131,6 +136,7 @@ export function GuidedCreator({
     !!cls,
     pairsOk && freeOk,
     !classRule?.rituals || rituals.length === classRule.rituals,
+    true,
     true,
   ][step];
 
@@ -536,6 +542,16 @@ export function GuidedCreator({
               )}
 
               {step === 6 && (
+                <div className="space-y-2" data-testid="g-appearance">
+                  <p className="text-sm text-ink-muted">
+                    Monte o visual do personagem: é assim que ele aparece no mapa. Dá para mudar depois na aba
+                    &quot;Aparência&quot; da ficha.
+                  </p>
+                  <AppearanceEditor value={appearance} seed={name || 'novo'} onChange={setAppearance} />
+                </div>
+              )}
+
+              {step === 7 && (
                 <div className="space-y-2 text-sm" data-testid="g-review">
                   <p className="font-display text-xl">{name}</p>
                   <p className="text-ink-muted">{concept}</p>
@@ -606,7 +622,7 @@ export function GuidedCreator({
                 Próximo <ArrowRight />
               </Button>
             ) : (
-              <Button onClick={() => onFinish({ name: name.trim(), concept, values })}>
+              <Button onClick={() => onFinish({ name: name.trim(), concept, values, appearance })}>
                 <Check /> Criar ficha
               </Button>
             )}

@@ -119,7 +119,7 @@ export function LibraryBoard({ sheets, campaigns }: { sheets: LibrarySheetDto[];
             seed: {
               name: r.name,
               concept: r.concept,
-              sheet: { ...EMPTY, system: r.values } as CharacterSheet,
+              sheet: { ...EMPTY, system: r.values, ...(r.appearance ? { appearance: r.appearance } : {}) } as CharacterSheet,
             },
           })
         }

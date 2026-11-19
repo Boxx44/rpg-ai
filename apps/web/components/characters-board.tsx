@@ -1,9 +1,10 @@
 'use client';
 
 import type { SystemDefinition, SystemValues } from '@rpg-ai/rules-engine';
-import type { CharacterDto, CharacterSheet, ChatMessageDto } from '@rpg-ai/shared';
+import type { Appearance, CharacterDto, CharacterSheet, ChatMessageDto } from '@rpg-ai/shared';
 import { Alert, Button, Card, CardContent, cn, Field, Input, Textarea } from '@rpg-ai/ui';
 import { Camera, Loader2, Minus, Plus, Trash2 } from 'lucide-react';
+import { AppearanceEditor } from './appearance-editor';
 import { ImagePicker } from './image-picker';
 import { draggingFiles, imageFrom, uploadAsset, useAssetUrl } from '@/lib/assets';
 import { toast } from '@/lib/feedback';
@@ -113,6 +114,10 @@ export function SheetEditor({
   const [color, setColor] = useState(initial?.color ?? seed?.color ?? '#7c4ff0');
   const [portrait, setPortrait] = useState<string | null>(initial?.portraitAsset ?? null);
   const [version, setVersion] = useState(initial?.version ?? 0);
+  const [sheetTab, setSheetTab] = useState<'ficha' | 'aparencia'>('ficha');
+  const [appearance, setAppearance] = useState<Appearance | null>(
+    initial?.sheet.appearance ?? seed?.sheet?.appearance ?? null,
+  );
   /** O retrato é salvo na hora (não precisa apertar "Salvar ficha"). */
   async function savePortrait(id: string | null) {
     setPortrait(id);
@@ -185,6 +190,7 @@ export function SheetEditor({
       resources: sheet.resources.filter((r) => r.label.trim()),
       inventory: sheet.inventory.filter((i) => i.name.trim()),
       notes: sheet.notes,
+      ...(appearance ? { appearance } : {}),
       ...(sys ? { system: sys } : {}),
     };
     try {
@@ -238,232 +244,345 @@ export function SheetEditor({
   return (
     <Card>
       <CardContent className="space-y-6 pt-6" data-testid="character-editor">
-        {initial && campaignId && !persist && (
-          <ImagePicker
-            campaignId={campaignId}
-            kind="portrait"
-            label="Retrato (aparece no token e no combate)"
-            value={portrait}
-            onChange={savePortrait}
-            className={readOnly ? 'pointer-events-none opacity-70' : undefined}
+        <div
+          className="flex gap-1 rounded-lg border border-line bg-surface/70 p-1"
+          role="tablist"
+          aria-label="Partes da ficha"
+        >
+          {(
+            [
+              ['ficha', 'Ficha'],
+              ['aparencia', 'Aparência'],
+            ] as const
+          ).map(([k, label]) => (
+            <button
+              key={k}
+              type="button"
+              role="tab"
+              aria-selected={sheetTab === k}
+              onClick={() => setSheetTab(k)}
+              className={cn(
+                'flex-1 rounded-md px-3 py-2 text-sm transition-colors',
+                sheetTab === k ? 'bg-arcane-700/60 text-ink' : 'text-ink-muted hover:text-ink',
+              )}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        {sheetTab === 'aparencia' && (
+          <AppearanceEditor
+            value={appearance}
+            seed={initial?.id ?? name ?? 'novo'}
+            onChange={setAppearance}
+            readOnly={readOnly}
           />
         )}
-        <div className="grid gap-4 sm:grid-cols-[1fr_1fr_auto]">
-          <Field label={nameLabel} htmlFor="ch-name">
-            <Input
-              id="ch-name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              maxLength={80}
-              disabled={readOnly}
+        <div className={cn('space-y-6', sheetTab !== 'ficha' && 'hidden')}>
+          {initial && campaignId && !persist && (
+            <ImagePicker
+              campaignId={campaignId}
+              kind="portrait"
+              label="Retrato (aparece no token e no combate)"
+              value={portrait}
+              onChange={savePortrait}
+              className={readOnly ? 'pointer-events-none opacity-70' : undefined}
             />
-          </Field>
-          <Field label="Conceito" htmlFor="ch-concept" hint="Classe, origem, arquétipo…">
-            <Input
-              id="ch-concept"
-              value={concept}
-              onChange={(e) => setConcept(e.target.value)}
-              maxLength={200}
-              disabled={readOnly}
-            />
-          </Field>
-          <Field label="Cor" htmlFor="ch-color">
-            <Input
-              id="ch-color"
-              type="color"
-              value={color}
-              onChange={(e) => setColor(e.target.value)}
-              className="w-16 p-1"
-              disabled={readOnly}
-            />
-          </Field>
-        </div>
+          )}
+          <div className="grid gap-4 sm:grid-cols-[1fr_1fr_auto]">
+            <Field label={nameLabel} htmlFor="ch-name">
+              <Input
+                id="ch-name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                maxLength={80}
+                disabled={readOnly}
+              />
+            </Field>
+            <Field label="Conceito" htmlFor="ch-concept" hint="Classe, origem, arquétipo…">
+              <Input
+                id="ch-concept"
+                value={concept}
+                onChange={(e) => setConcept(e.target.value)}
+                maxLength={200}
+                disabled={readOnly}
+              />
+            </Field>
+            <Field label="Cor" htmlFor="ch-color">
+              <Input
+                id="ch-color"
+                type="color"
+                value={color}
+                onChange={(e) => setColor(e.target.value)}
+                className="w-16 p-1"
+                disabled={readOnly}
+              />
+            </Field>
+          </div>
 
-        {def && sys ? (
-          <>
-            <SystemSheet
-              def={def}
-              value={sys}
-              onChange={setSys}
-              readOnly={readOnly}
-              onRoll={initial?.canEdit ? roll : undefined}
-              rolling={rolling}
-            />
-            {lastRoll && (
-              <Alert tone="info" title={`${lastRoll.label}: ${lastRoll.total}`}>
-                {lastRoll.expression} — também enviado para a crônica da mesa.
-                {lastRoll.notes.map((n) => (
-                  <span key={n} className="block text-gold-bright">
-                    {n}
-                  </span>
-                ))}
-              </Alert>
-            )}
-            {!initial && campaignId && (
-              <p className="text-xs text-ink-faint">Salve a ficha para poder rolar os testes direto daqui.</p>
-            )}
-          </>
-        ) : (
-          <>
-            <section>
-              <SectionTitle
-                action={
-                  !readOnly && (
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() =>
-                        upd('resources', [...sheet.resources, { label: '', current: 0, max: 0 }])
-                      }
-                    >
-                      <Plus /> Recurso
-                    </Button>
-                  )
-                }
-              >
-                Recursos
-              </SectionTitle>
-              <div className="grid gap-2 sm:grid-cols-2">
-                {sheet.resources.map((r, i) => {
-                  const set = (patch: Partial<typeof r>) =>
-                    upd(
-                      'resources',
-                      sheet.resources.map((x, j) => (j === i ? { ...x, ...patch } : x)),
+          {def && sys ? (
+            <>
+              <SystemSheet
+                def={def}
+                value={sys}
+                onChange={setSys}
+                readOnly={readOnly}
+                onRoll={initial?.canEdit ? roll : undefined}
+                rolling={rolling}
+              />
+              {lastRoll && (
+                <Alert tone="info" title={`${lastRoll.label}: ${lastRoll.total}`}>
+                  {lastRoll.expression} — também enviado para a crônica da mesa.
+                  {lastRoll.notes.map((n) => (
+                    <span key={n} className="block text-gold-bright">
+                      {n}
+                    </span>
+                  ))}
+                </Alert>
+              )}
+              {!initial && campaignId && (
+                <p className="text-xs text-ink-faint">
+                  Salve a ficha para poder rolar os testes direto daqui.
+                </p>
+              )}
+            </>
+          ) : (
+            <>
+              <section>
+                <SectionTitle
+                  action={
+                    !readOnly && (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() =>
+                          upd('resources', [...sheet.resources, { label: '', current: 0, max: 0 }])
+                        }
+                      >
+                        <Plus /> Recurso
+                      </Button>
+                    )
+                  }
+                >
+                  Recursos
+                </SectionTitle>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {sheet.resources.map((r, i) => {
+                    const set = (patch: Partial<typeof r>) =>
+                      upd(
+                        'resources',
+                        sheet.resources.map((x, j) => (j === i ? { ...x, ...patch } : x)),
+                      );
+                    const pct = r.max > 0 ? Math.max(0, Math.min(100, (r.current / r.max) * 100)) : 0;
+                    return (
+                      <div key={i} className="space-y-2 rounded-lg border border-line bg-surface-2/50 p-3">
+                        <div className="flex items-center gap-2">
+                          <Input
+                            aria-label="Nome do recurso"
+                            value={r.label}
+                            onChange={(e) => set({ label: e.target.value })}
+                            placeholder="Vida, Mana…"
+                            className="h-8 text-sm"
+                            disabled={readOnly}
+                          />
+                          {!readOnly && (
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              aria-label="Remover recurso"
+                              onClick={() =>
+                                upd(
+                                  'resources',
+                                  sheet.resources.filter((_, j) => j !== i),
+                                )
+                              }
+                            >
+                              <Trash2 />
+                            </Button>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {!readOnly && (
+                            <Button
+                              size="icon"
+                              variant="secondary"
+                              aria-label={`Diminuir ${r.label}`}
+                              onClick={() => set({ current: r.current - 1 })}
+                            >
+                              <Minus />
+                            </Button>
+                          )}
+                          <Input
+                            aria-label={`${r.label} atual`}
+                            type="number"
+                            value={r.current}
+                            onChange={(e) => set({ current: Number(e.target.value) || 0 })}
+                            className="h-9 w-20 text-center"
+                            disabled={readOnly}
+                          />
+                          <span className="text-ink-faint">/</span>
+                          <Input
+                            aria-label={`${r.label} máximo`}
+                            type="number"
+                            min={0}
+                            value={r.max}
+                            onChange={(e) => set({ max: Math.max(0, Number(e.target.value) || 0) })}
+                            className="h-9 w-20 text-center"
+                            disabled={readOnly}
+                          />
+                          {!readOnly && (
+                            <Button
+                              size="icon"
+                              variant="secondary"
+                              aria-label={`Aumentar ${r.label}`}
+                              onClick={() => set({ current: r.current + 1 })}
+                            >
+                              <Plus />
+                            </Button>
+                          )}
+                        </div>
+                        <div className="h-1.5 overflow-hidden rounded-full bg-bg">
+                          <div
+                            className="h-full bg-gradient-to-r from-arcane-600 to-arcane-400 transition-all"
+                            style={{ width: `${pct}%` }}
+                          />
+                        </div>
+                      </div>
                     );
-                  const pct = r.max > 0 ? Math.max(0, Math.min(100, (r.current / r.max) * 100)) : 0;
-                  return (
-                    <div key={i} className="space-y-2 rounded-lg border border-line bg-surface-2/50 p-3">
-                      <div className="flex items-center gap-2">
-                        <Input
-                          aria-label="Nome do recurso"
-                          value={r.label}
-                          onChange={(e) => set({ label: e.target.value })}
-                          placeholder="Vida, Mana…"
-                          className="h-8 text-sm"
-                          disabled={readOnly}
-                        />
-                        {!readOnly && (
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            aria-label="Remover recurso"
-                            onClick={() =>
-                              upd(
-                                'resources',
-                                sheet.resources.filter((_, j) => j !== i),
-                              )
-                            }
-                          >
-                            <Trash2 />
-                          </Button>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-2">
-                        {!readOnly && (
-                          <Button
-                            size="icon"
-                            variant="secondary"
-                            aria-label={`Diminuir ${r.label}`}
-                            onClick={() => set({ current: r.current - 1 })}
-                          >
-                            <Minus />
-                          </Button>
-                        )}
-                        <Input
-                          aria-label={`${r.label} atual`}
-                          type="number"
-                          value={r.current}
-                          onChange={(e) => set({ current: Number(e.target.value) || 0 })}
-                          className="h-9 w-20 text-center"
-                          disabled={readOnly}
-                        />
-                        <span className="text-ink-faint">/</span>
-                        <Input
-                          aria-label={`${r.label} máximo`}
-                          type="number"
-                          min={0}
-                          value={r.max}
-                          onChange={(e) => set({ max: Math.max(0, Number(e.target.value) || 0) })}
-                          className="h-9 w-20 text-center"
-                          disabled={readOnly}
-                        />
-                        {!readOnly && (
-                          <Button
-                            size="icon"
-                            variant="secondary"
-                            aria-label={`Aumentar ${r.label}`}
-                            onClick={() => set({ current: r.current + 1 })}
-                          >
-                            <Plus />
-                          </Button>
-                        )}
-                      </div>
-                      <div className="h-1.5 overflow-hidden rounded-full bg-bg">
-                        <div
-                          className="h-full bg-gradient-to-r from-arcane-600 to-arcane-400 transition-all"
-                          style={{ width: `${pct}%` }}
-                        />
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </section>
+                  })}
+                </div>
+              </section>
 
-            <section>
-              <SectionTitle
-                action={
-                  !readOnly && (
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => upd('attributes', [...sheet.attributes, { label: '', value: '' }])}
-                    >
-                      <Plus /> Atributo
-                    </Button>
-                  )
-                }
-              >
-                Atributos
-              </SectionTitle>
-              <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                {sheet.attributes.map((a, i) => (
-                  <div key={i} className="flex items-center gap-2">
+              <section>
+                <SectionTitle
+                  action={
+                    !readOnly && (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => upd('attributes', [...sheet.attributes, { label: '', value: '' }])}
+                      >
+                        <Plus /> Atributo
+                      </Button>
+                    )
+                  }
+                >
+                  Atributos
+                </SectionTitle>
+                <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                  {sheet.attributes.map((a, i) => (
+                    <div key={i} className="flex items-center gap-2">
+                      <Input
+                        aria-label="Nome do atributo"
+                        value={a.label}
+                        placeholder="Atributo"
+                        onChange={(e) =>
+                          upd(
+                            'attributes',
+                            sheet.attributes.map((x, j) => (j === i ? { ...x, label: e.target.value } : x)),
+                          )
+                        }
+                        className="h-9"
+                        disabled={readOnly}
+                      />
+                      <Input
+                        aria-label={`Valor de ${a.label}`}
+                        value={a.value}
+                        placeholder="Valor"
+                        onChange={(e) =>
+                          upd(
+                            'attributes',
+                            sheet.attributes.map((x, j) => (j === i ? { ...x, value: e.target.value } : x)),
+                          )
+                        }
+                        className="h-9 w-24 text-center"
+                        disabled={readOnly}
+                      />
+                      {!readOnly && (
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          aria-label="Remover atributo"
+                          onClick={() =>
+                            upd(
+                              'attributes',
+                              sheet.attributes.filter((_, j) => j !== i),
+                            )
+                          }
+                        >
+                          <Trash2 />
+                        </Button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </section>
+            </>
+          )}
+
+          <section>
+            <SectionTitle
+              action={
+                !readOnly && (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => upd('inventory', [...sheet.inventory, { name: '', qty: 1, notes: '' }])}
+                  >
+                    <Plus /> Item
+                  </Button>
+                )
+              }
+            >
+              Inventário
+            </SectionTitle>
+            {sheet.inventory.length === 0 && <p className="text-sm text-ink-faint">Mochila vazia.</p>}
+            <div className="space-y-2">
+              {sheet.inventory.map((it, i) => {
+                const set = (patch: Partial<typeof it>) =>
+                  upd(
+                    'inventory',
+                    sheet.inventory.map((x, j) => (j === i ? { ...x, ...patch } : x)),
+                  );
+                return (
+                  <div
+                    key={i}
+                    className="grid grid-cols-[1fr_5rem_auto] gap-2 sm:grid-cols-[1fr_5rem_1fr_auto]"
+                  >
                     <Input
-                      aria-label="Nome do atributo"
-                      value={a.label}
-                      placeholder="Atributo"
-                      onChange={(e) =>
-                        upd(
-                          'attributes',
-                          sheet.attributes.map((x, j) => (j === i ? { ...x, label: e.target.value } : x)),
-                        )
-                      }
+                      aria-label="Item"
+                      value={it.name}
+                      placeholder="Item"
+                      onChange={(e) => set({ name: e.target.value })}
                       className="h-9"
                       disabled={readOnly}
                     />
                     <Input
-                      aria-label={`Valor de ${a.label}`}
-                      value={a.value}
-                      placeholder="Valor"
-                      onChange={(e) =>
-                        upd(
-                          'attributes',
-                          sheet.attributes.map((x, j) => (j === i ? { ...x, value: e.target.value } : x)),
-                        )
-                      }
-                      className="h-9 w-24 text-center"
+                      aria-label="Quantidade"
+                      type="number"
+                      min={0}
+                      value={it.qty}
+                      onChange={(e) => set({ qty: Math.max(0, Number(e.target.value) || 0) })}
+                      className="h-9 text-center"
+                      disabled={readOnly}
+                    />
+                    <Input
+                      aria-label="Observações"
+                      value={it.notes}
+                      placeholder="Observações"
+                      onChange={(e) => set({ notes: e.target.value })}
+                      className="hidden h-9 sm:block"
                       disabled={readOnly}
                     />
                     {!readOnly && (
                       <Button
                         size="icon"
                         variant="ghost"
-                        aria-label="Remover atributo"
+                        aria-label="Remover item"
                         onClick={() =>
                           upd(
-                            'attributes',
-                            sheet.attributes.filter((_, j) => j !== i),
+                            'inventory',
+                            sheet.inventory.filter((_, j) => j !== i),
                           )
                         }
                       >
@@ -471,99 +590,23 @@ export function SheetEditor({
                       </Button>
                     )}
                   </div>
-                ))}
-              </div>
-            </section>
-          </>
-        )}
-
-        <section>
-          <SectionTitle
-            action={
-              !readOnly && (
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => upd('inventory', [...sheet.inventory, { name: '', qty: 1, notes: '' }])}
-                >
-                  <Plus /> Item
-                </Button>
-              )
-            }
-          >
-            Inventário
-          </SectionTitle>
-          {sheet.inventory.length === 0 && <p className="text-sm text-ink-faint">Mochila vazia.</p>}
-          <div className="space-y-2">
-            {sheet.inventory.map((it, i) => {
-              const set = (patch: Partial<typeof it>) =>
-                upd(
-                  'inventory',
-                  sheet.inventory.map((x, j) => (j === i ? { ...x, ...patch } : x)),
                 );
-              return (
-                <div
-                  key={i}
-                  className="grid grid-cols-[1fr_5rem_auto] gap-2 sm:grid-cols-[1fr_5rem_1fr_auto]"
-                >
-                  <Input
-                    aria-label="Item"
-                    value={it.name}
-                    placeholder="Item"
-                    onChange={(e) => set({ name: e.target.value })}
-                    className="h-9"
-                    disabled={readOnly}
-                  />
-                  <Input
-                    aria-label="Quantidade"
-                    type="number"
-                    min={0}
-                    value={it.qty}
-                    onChange={(e) => set({ qty: Math.max(0, Number(e.target.value) || 0) })}
-                    className="h-9 text-center"
-                    disabled={readOnly}
-                  />
-                  <Input
-                    aria-label="Observações"
-                    value={it.notes}
-                    placeholder="Observações"
-                    onChange={(e) => set({ notes: e.target.value })}
-                    className="hidden h-9 sm:block"
-                    disabled={readOnly}
-                  />
-                  {!readOnly && (
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      aria-label="Remover item"
-                      onClick={() =>
-                        upd(
-                          'inventory',
-                          sheet.inventory.filter((_, j) => j !== i),
-                        )
-                      }
-                    >
-                      <Trash2 />
-                    </Button>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </section>
+              })}
+            </div>
+          </section>
 
-        {extra}
-        <Field label="Anotações e história" htmlFor="ch-notes">
-          <Textarea
-            id="ch-notes"
-            value={sheet.notes}
-            onChange={(e) => upd('notes', e.target.value)}
-            maxLength={8000}
-            className="min-h-32"
-            disabled={readOnly}
-          />
-        </Field>
-
+          {extra}
+          <Field label="Anotações e história" htmlFor="ch-notes">
+            <Textarea
+              id="ch-notes"
+              value={sheet.notes}
+              onChange={(e) => upd('notes', e.target.value)}
+              maxLength={8000}
+              className="min-h-32"
+              disabled={readOnly}
+            />
+          </Field>
+        </div>
         {error && <Alert tone="error">{error}</Alert>}
         {/* No celular, os botões ficam presos embaixo para não precisar rolar a ficha toda. */}
         <div className="flex flex-wrap justify-between gap-2 max-lg:sticky max-lg:bottom-0 max-lg:z-20 max-lg:-mx-6 max-lg:border-t max-lg:border-line max-lg:bg-surface/95 max-lg:px-6 max-lg:py-3 max-lg:backdrop-blur">

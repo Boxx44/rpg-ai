@@ -96,6 +96,14 @@ test('biblioteca: criação guiada passo a passo e levar para a campanha', async
   await page.getByRole('button', { name: 'Próximo' }).click();
   await g.locator('label', { hasText: 'Pistola' }).locator('input').check();
   await page.getByRole('button', { name: 'Próximo' }).click();
+  // Passo "Aparência": monta o boneco 2D
+  const ap = page.getByTestId('appearance-editor');
+  await expect(ap).toBeVisible();
+  await ap.getByRole('tab', { name: 'Cabelo' }).click();
+  await ap.getByRole('radio', { name: 'Coque' }).click();
+  await ap.getByRole('radiogroup', { name: 'Cor do cabelo' }).getByRole('radio', { name: 'Cor #9e2a1e' }).click();
+  await expect(ap.getByTestId('appearance-preview').locator('[data-avatar]')).toHaveAttribute('data-avatar', /-coque-/);
+  await page.getByRole('button', { name: 'Próximo' }).click();
   await expect(page.getByTestId('g-review')).toContainText('Bia Torres');
   await expect(page.getByTestId('g-review')).toContainText('Pistola');
   await page.getByRole('button', { name: 'Criar ficha' }).click();
@@ -104,6 +112,10 @@ test('biblioteca: criação guiada passo a passo e levar para a campanha', async
   await page.getByTestId('derived-defesa').getByTitle('O que é Defesa?').click();
   await expect(page.getByTestId('help-bubble')).toContainText('10 + Agilidade');
   await page.screenshot({ path: 'test-results/screens/help-bubble.png' });
+  // a aparência escolhida veio junto para a ficha
+  await page.getByRole('tab', { name: 'Aparência' }).click();
+  await expect(page.getByTestId('appearance-preview').locator('[data-avatar]')).toHaveAttribute('data-avatar', /-coque-/);
+  await page.getByRole('tab', { name: 'Ficha' }).click();
   await page.getByRole('button', { name: 'Salvar ficha' }).click();
   const card = page.getByTestId('library-card').filter({ hasText: 'Bia Torres' });
   await expect(card).toBeVisible();
