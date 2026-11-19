@@ -232,6 +232,40 @@ describe('personagens', () => {
       .expect(200);
   });
 
+  it('aparência do boneco 2D fica salva na ficha; valores estranhos são recusados', async () => {
+    const appearance = {
+      body: 'forte',
+      skin: '#8d5a3b',
+      eyes: '#3a6b8f',
+      hair: { style: 'coque', color: '#9e2a1e', streak: null },
+      top: { style: 'sobretudo', color: '#22313f', accent: '#c9a227' },
+      bottom: { style: 'cargo', color: '#2b2b2b' },
+      shoes: { style: 'botas', color: '#1a1a1a' },
+      accessories: ['caveira', 'luvas'],
+      held: 'katana',
+      hood: false,
+    };
+    const r = await request(t.http)
+      .post(`/campaigns/${cid}/characters`)
+      .set(auth(p1))
+      .send({ name: 'Aparência', sheet: { appearance } })
+      .expect(201);
+    const l = await request(t.http).get(`/campaigns/${cid}/characters`).set(auth(p2)).expect(200);
+    const got = l.body.find((c: { id: string }) => c.id === r.body.id);
+    expect(got.sheet.appearance).toMatchObject(appearance);
+    await request(t.http)
+      .post(`/campaigns/${cid}/characters`)
+      .set(auth(p1))
+      .send({ name: 'X', sheet: { appearance: { ...appearance, hair: { style: 'inventado', color: '#000000' } } } })
+      .expect(400);
+    await request(t.http)
+      .post(`/campaigns/${cid}/characters`)
+      .set(auth(p1))
+      .send({ name: 'X', sheet: { appearance: { ...appearance, skin: 'url(javascript:alert(1))' } } })
+      .expect(400);
+    await request(t.http).delete(`/campaigns/${cid}/characters/${r.body.id}`).set(auth(p1)).expect(204);
+  });
+
   it('ficha inválida é rejeitada', async () => {
     await request(t.http)
       .post(`/campaigns/${cid}/characters`)

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { appearanceSchema } from './appearance';
 import { MAP_TEMPLATE_KEYS } from './map-templates';
 
 const text = (max: number) => z.string().trim().max(max);
@@ -82,6 +83,8 @@ export const characterSheetSchema = z.object({
     .max(100)
     .default([]),
   notes: text(8000).default(''),
+  /** Aparência do boneco 2D (cabelo, corpo, roupas, cores). */
+  appearance: appearanceSchema.optional(),
   /** Valores do sistema da campanha (validados no servidor contra a definição do sistema). */
   system: z
     .object({
