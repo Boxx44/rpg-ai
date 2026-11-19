@@ -22,6 +22,8 @@ export default defineConfig({
   use: {
     baseURL: 'http://localhost:3100',
     trace: 'retain-on-failure',
+    // "Menos movimento": animações infinitas (boneco respirando) não atrapalham os cliques dos testes
+    reducedMotion: 'reduce',
     screenshot: 'only-on-failure',
     launchOptions: process.env.PW_CHROME_PATH ? { executablePath: process.env.PW_CHROME_PATH } : {},
   },

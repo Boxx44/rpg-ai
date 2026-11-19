@@ -36,6 +36,7 @@
   --animate-spin-slow: spin-slow 14s linear infinite;
   --animate-drift: drift 3.5s linear infinite;
   --animate-float-up: float-up 1.4s ease-out forwards;
+  --animate-bob: bob 2.6s ease-in-out infinite;
   --animate-shake: shake 0.45s ease-in-out;
   --animate-ring-pulse: ring-pulse 1.6s ease-out infinite;
   --animate-dice: dice-tumble 0.7s cubic-bezier(0.2, 0.8, 0.3, 1.2) both;
@@ -91,6 +92,15 @@
     }
     to {
       transform: translateX(40px);
+    }
+  }
+  @keyframes bob {
+    0%,
+    100% {
+      transform: translateY(0) scaleY(1);
+    }
+    50% {
+      transform: translateY(-1.2px) scaleY(1.015);
     }
   }
   @keyframes float-up {

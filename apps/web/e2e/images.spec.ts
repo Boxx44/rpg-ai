@@ -1,4 +1,5 @@
 import { type Browser, expect, type Page, test } from '@playwright/test';
+import { mapPoint } from './map-helpers';
 
 /**
  * Imagens e combate: modelo de mapa pronto, fundo por imagem (com ajuste da grade),
@@ -96,8 +97,8 @@ test('fundo por imagem, ajuste da grade e imagem de token', async () => {
   await gmPage.getByRole('button', { name: 'Colocar token' }).click();
   await gmPage.getByLabel('Nome do token').fill('Sombra');
   const canvas = gmPage.getByTestId('map-canvas');
-  const box = (await canvas.boundingBox())!;
-  await gmPage.mouse.click(box.x + 100, box.y + 100);
+  const p = (await mapPoint(canvas))(100, 100);
+  await gmPage.mouse.click(p.x, p.y);
   await gmPage.getByRole('button', { name: 'Mover', exact: true }).click();
   await gmPage.locator('[data-testid="map-token"][data-label="Sombra"]').click();
   await gmPage

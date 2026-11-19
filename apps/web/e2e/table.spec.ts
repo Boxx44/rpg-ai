@@ -1,4 +1,5 @@
 import { type Browser, expect, type Locator, type Page, test } from '@playwright/test';
+import { mapPoint } from './map-helpers';
 
 /**
  * Mesa de jogo com dois navegadores ao mesmo tempo (mestre e jogador):
@@ -98,25 +99,26 @@ test('mestre cria e pinta um mapa, coloca tokens e compartilha', async () => {
 
   // Pinta uma parede arrastando
   await gmPage.getByRole('button', { name: 'Parede' }).click();
-  const box = (await canvas.boundingBox())!;
-  await gmPage.mouse.move(box.x + 20, box.y + 20);
+  let at = await mapPoint(canvas);
+  await gmPage.mouse.move(at(20, 20).x, at(20, 20).y);
   await gmPage.mouse.down();
-  await gmPage.mouse.move(box.x + 300, box.y + 20, { steps: 10 });
+  await gmPage.mouse.move(at(300, 20).x, at(300, 20).y, { steps: 20 });
   await gmPage.mouse.up();
   await expect(gmPage.locator('[data-terrain="wall"]')).toHaveCount(8);
 
   // Token do personagem do jogador
   await gmPage.getByRole('button', { name: 'Colocar token' }).click();
   await gmPage.getByLabel('Vincular a').selectOption({ label: `Lyra (${pl.name})` });
-  await gmPage.mouse.click(box.x + 60, box.y + 100);
+  at = await mapPoint(canvas);
+  await gmPage.mouse.click(at(60, 100).x, at(60, 100).y);
   await expect(gmPage.getByTestId('map-token').filter({ hasText: 'L' })).toHaveCount(1);
 
   // Inimigo oculto
   await gmPage.getByLabel('Vincular a').selectOption('');
   await gmPage.getByLabel('Nome do token').fill('Esqueleto');
   await gmPage.getByLabel('Oculto').check();
-  const box2 = (await canvas.boundingBox())!; // o painel lateral pode ter rolado a página
-  await gmPage.mouse.click(box2.x + 420, box2.y + 260);
+  at = await mapPoint(canvas); // o painel lateral pode ter rolado a página
+  await gmPage.mouse.click(at(420, 260).x, at(420, 260).y);
   await expect(gmPage.getByTestId('map-token')).toHaveCount(2);
 
   await gmPage.getByTestId('toggle-share').click();
@@ -135,7 +137,10 @@ test('jogador vê o mapa ao vivo, sem o inimigo oculto, e move o próprio token'
   await expect(plTokens.first()).toHaveAttribute('data-label', 'Lyra');
   await expect(gmPage.getByTestId('map-token')).toHaveCount(2);
 
-  await dragBy(plPage, plTokens.first(), 3, 1);
+  const scale = await plPage
+    .getByTestId('map-canvas')
+    .evaluate((el) => el.getBoundingClientRect().width / (el as SVGSVGElement).viewBox.baseVal.width);
+  await dragBy(plPage, plTokens.first(), 3, 1, 40 * scale);
   await expect(plTokens.first()).toHaveAttribute('data-x', '4');
   // O mestre recebe o movimento em tempo real
   await expect(gmPage.locator('[data-label="Lyra"]')).toHaveAttribute('data-x', '4');

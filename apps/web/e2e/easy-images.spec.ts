@@ -1,4 +1,5 @@
 import { expect, type Page, test } from '@playwright/test';
+import { mapPoint } from './map-helpers';
 
 /**
  * Imagens fáceis: botão "Imagem de fundo" na barra, arrastar do computador para o mapa
@@ -95,23 +96,23 @@ test('fundo pelo botão da barra, por arrastar e por Ctrl+V; imagem arrastada pa
   // 2) token e arrastar imagem por cima dele
   await page.getByRole('button', { name: 'Colocar token' }).click();
   await page.getByLabel('Nome do token').fill('Sombra');
-  await canvas.evaluate((el) => el.scrollIntoView({ block: 'center' }));
-  const box = (await canvas.boundingBox())!;
-  await page.mouse.click(box.x + 100, box.y + 100);
+  const at = await mapPoint(canvas);
+  await page.mouse.click(at(100, 100).x, at(100, 100).y);
   await page.getByRole('button', { name: 'Mover', exact: true }).click();
   const token = page.locator('[data-testid="map-token"][data-label="Sombra"]');
   const tb = (await token.boundingBox())!;
-  const at = { clientX: tb.x + tb.width / 2, clientY: tb.y + tb.height / 2 };
+  const on = { clientX: tb.x + tb.width / 2, clientY: tb.y + tb.height - 6 };
   const wrap = canvas.locator('xpath=ancestor::div[2]');
   const dt1 = await dataTransfer(page, SQ, 'sombra.png');
-  await wrap.dispatchEvent('dragover', { dataTransfer: dt1, ...at });
+  await wrap.dispatchEvent('dragover', { dataTransfer: dt1, ...on });
   await expect(page.getByTestId('drop-overlay')).toContainText('Sombra');
-  await wrap.dispatchEvent('drop', { dataTransfer: dt1, ...at });
+  await wrap.dispatchEvent('drop', { dataTransfer: dt1, ...on });
   await expect(page.getByTestId('token-image')).toHaveCount(1);
   await expect(page.getByTestId('drop-overlay')).toHaveCount(0);
 
   // 3) arrastar para um lugar vazio troca o fundo
-  const empty = { clientX: box.x + 400, clientY: box.y + 400 };
+  const e400 = (await mapPoint(canvas))(400, 400);
+  const empty = { clientX: e400.x, clientY: e400.y };
   const dt2 = await dataTransfer(page, BG, 'outro.png');
   await wrap.dispatchEvent('dragover', { dataTransfer: dt2, ...empty });
   await expect(page.getByTestId('drop-overlay')).toContainText('fundo do mapa');

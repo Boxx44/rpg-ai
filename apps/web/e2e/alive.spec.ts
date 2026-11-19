@@ -1,4 +1,5 @@
 import { type Browser, expect, type Page, test } from '@playwright/test';
+import { mapPoint } from './map-helpers';
 
 /**
  * Mesa "viva": preferências de acessibilidade, objetos no mapa (porta que abre,
@@ -86,20 +87,19 @@ test('mestre monta mapa com porta, tocha e baú', async ({ browser }) => {
 
   // Novos pisos
   await gmPage.getByRole('button', { name: 'Assoalho' }).click();
-  const box = (await canvas.boundingBox())!;
-  await gmPage.mouse.move(box.x + 20, box.y + 60);
+  let at = await mapPoint(canvas);
+  await gmPage.mouse.move(at(20, 60).x, at(20, 60).y);
   await gmPage.mouse.down();
-  await gmPage.mouse.move(box.x + 220, box.y + 60, { steps: 8 });
+  await gmPage.mouse.move(at(220, 60).x, at(220, 60).y, { steps: 12 });
   await gmPage.mouse.up();
   await expect(gmPage.locator('[data-terrain="wood"]')).toHaveCount(6);
 
   // Água se mexendo numa faixa embaixo
   await gmPage.getByRole('button', { name: 'Água' }).click();
-  await canvas.scrollIntoViewIfNeeded();
-  const wbox = (await canvas.boundingBox())!;
-  await gmPage.mouse.move(wbox.x + 20, wbox.y + 300);
+  at = await mapPoint(canvas);
+  await gmPage.mouse.move(at(20, 300).x, at(20, 300).y);
   await gmPage.mouse.down();
-  await gmPage.mouse.move(wbox.x + 460, wbox.y + 300, { steps: 24 });
+  await gmPage.mouse.move(at(460, 300).x, at(460, 300).y, { steps: 30 });
   await gmPage.mouse.up();
   await expect(gmPage.locator('[data-terrain="water"]')).toHaveCount(12);
 
@@ -108,10 +108,8 @@ test('mestre monta mapa com porta, tocha e baú', async ({ browser }) => {
   await expect(palette).toBeVisible();
   const placeAt = async (prop: string, px: number, py: number) => {
     await palette.getByRole('button', { name: prop, exact: true }).click();
-    // centraliza o mapa na tela (o cabeçalho fixo não pode ficar por cima)
-    await canvas.evaluate((el) => el.scrollIntoView({ block: 'center' }));
-    const b = (await canvas.boundingBox())!;
-    await gmPage.mouse.click(b.x + px, b.y + py);
+    const p = (await mapPoint(canvas))(px, py);
+    await gmPage.mouse.click(p.x, p.y);
   };
   await placeAt('Porta', 100, 140);
   await placeAt('Tocha', 260, 140);
