@@ -1,5 +1,6 @@
 import {
   type CampaignDto,
+  type CampaignSystemDto,
   canManageCampaign,
   type CharacterDto,
   type MapSummaryDto,
@@ -17,10 +18,11 @@ export default async function MapsPage({ params }: { params: Promise<{ id: strin
   const token = await serverToken();
   const campaign = await api<CampaignDto>(`/campaigns/${id}`, token);
   if (!canManageCampaign(campaign.myRole)) notFound();
-  const [maps, characters, npcs] = await Promise.all([
+  const [maps, characters, npcs, system] = await Promise.all([
     api<MapSummaryDto[]>(`/campaigns/${id}/maps`, token),
     api<CharacterDto[]>(`/campaigns/${id}/characters`, token),
     api<NpcDto[]>(`/campaigns/${id}/npcs`, token),
+    api<CampaignSystemDto | null>(`/campaigns/${id}/system`, token),
   ]);
-  return <MapEditor campaignId={id} maps={maps} characters={characters} npcs={npcs} />;
+  return <MapEditor campaignId={id} maps={maps} characters={characters} npcs={npcs} system={system} />;
 }

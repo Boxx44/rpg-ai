@@ -100,6 +100,8 @@ export interface MapCanvasProps {
    * (ou null = fundo do mapa). Sem esta função, o mapa não aceita imagens.
    */
   onDropImage?: (file: File, target: TokenDto | null) => void;
+  /** Peças recém-descobertas: aparecem com brilho e faíscas. */
+  discovered?: string[];
   /** Abrir já ajustado à largura disponível (padrão: sim). */
   autoFit?: boolean;
   /** Texto do aviso ao arrastar sobre o fundo / sobre uma peça. */
@@ -151,8 +153,10 @@ export function MapCanvas({
   onDropImage,
   dropHint,
   autoFit = true,
+  discovered,
   className,
 }: MapCanvasProps) {
+  const fresh = new Set(discovered ?? []);
   /** Arrastando um arquivo de imagem por cima do mapa: mostra onde vai cair. */
   const [dropOver, setDropOver] = useState<{ target: TokenDto | null } | null>(null);
   const tokenAt = (x: number, y: number): TokenDto | null => {
@@ -502,6 +506,11 @@ export function MapCanvas({
             </filter>
             <PropDefs />
             <FigureDefs />
+            <radialGradient id="g-discover">
+              <stop offset="0" stopColor="rgba(255,240,180,0.9)" />
+              <stop offset="0.5" stopColor="rgba(255,210,90,0.45)" />
+              <stop offset="1" stopColor="rgba(255,210,90,0)" />
+            </radialGradient>
             <pattern id="p-floor" width="40" height="40" patternUnits="userSpaceOnUse">
               <rect width="40" height="40" fill="#2a2433" />
               <path d="M0 0H40V40" fill="none" stroke="rgba(0,0,0,0.25)" />
@@ -783,7 +792,13 @@ export function MapCanvas({
                   {canUse ? ' (clique para usar)' : ''}
                 </title>
                 <rect width={box} height={box} fill="transparent" />
-                <g filter={FLAT_PROPS.includes(t.icon!) ? undefined : 'url(#f-shadow)'}>
+                <g
+                  filter={FLAT_PROPS.includes(t.icon!) ? undefined : 'url(#f-shadow)'}
+                  className={fresh.has(t.id) ? 'animate-discover' : undefined}
+                  style={
+                    fresh.has(t.id) ? { transformOrigin: 'center', transformBox: 'fill-box' } : undefined
+                  }
+                >
                   <g transform={`rotate(${t.rotation} ${box / 2} ${box / 2}) scale(${box / 100})`}>
                     <PropArt kind={t.icon!} state={t.state} />
                   </g>
@@ -907,7 +922,13 @@ export function MapCanvas({
                     transition: 'transform .15s',
                   }}
                 >
-                  <g transform={`scale(${(2 * r) / 100})`}>
+                  <g
+                    transform={`scale(${(2 * r) / 100})`}
+                    className={fresh.has(t.id) ? 'animate-discover' : undefined}
+                    style={
+                      fresh.has(t.id) ? { transformOrigin: 'center', transformBox: 'fill-box' } : undefined
+                    }
+                  >
                     <TokenFigure
                       token={t}
                       portrait={t.image ? urls[t.image] : undefined}
@@ -982,6 +1003,53 @@ export function MapCanvas({
               </g>
             );
           })}
+          {/* Descoberta: anel dourado e faíscas saindo da peça encontrada */}
+          {map.tokens
+            .filter((t) => fresh.has(t.id))
+            .map((t) => {
+              const cx = (t.x + t.size / 2) * CELL;
+              const cy = (t.y + t.size / 2) * CELL;
+              return (
+                <g key={`burst-${t.id}`} pointerEvents="none" data-testid="discover-burst">
+                  <circle
+                    cx={cx}
+                    cy={cy}
+                    r={CELL * 0.7}
+                    fill="url(#g-discover)"
+                    className="animate-burst"
+                    style={{ transformOrigin: 'center', transformBox: 'fill-box' }}
+                  />
+                  <circle
+                    cx={cx}
+                    cy={cy}
+                    r={CELL * 0.55}
+                    fill="none"
+                    stroke="#ffe9a8"
+                    strokeWidth={3}
+                    className="animate-burst"
+                    style={{ transformOrigin: 'center', transformBox: 'fill-box', animationDelay: '0.15s' }}
+                  />
+                  <g
+                    className="animate-burst"
+                    style={{ transformOrigin: `${cx}px ${cy}px`, animationDuration: '1.9s' }}
+                  >
+                    {Array.from({ length: 10 }, (_, i) => {
+                      const a = (i * Math.PI) / 5;
+                      const d = CELL * (0.55 + (i % 3) * 0.12);
+                      const x = cx + Math.cos(a) * d;
+                      const y = cy + Math.sin(a) * d;
+                      return (
+                        <path
+                          key={i}
+                          d={`M${x} ${y - 5} L${x + 1.4} ${y - 1.4} L${x + 5} ${y} L${x + 1.4} ${y + 1.4} L${x} ${y + 5} L${x - 1.4} ${y + 1.4} L${x - 5} ${y} L${x - 1.4} ${y - 1.4} Z`}
+                          fill={i % 2 ? '#fff6d0' : '#ffd25a'}
+                        />
+                      );
+                    })}
+                  </g>
+                </g>
+              );
+            })}
           <rect width={W} height={H} fill="url(#g-vignette)" pointerEvents="none" />
         </svg>
         {dropOver && (

@@ -212,6 +212,18 @@ O restante (regras extraídas, sessões, combate, memória, IA) entra nas fases 
   - `app_private.can_view_asset(imagem)`: quem pode ver.
 - O gatilho `app_private.check_asset_ref(coluna)` exige que a imagem seja da mesma campanha e de quem a usa (o mestre pode usar qualquer uma).
 
+## Segredos no mapa (migration `0011_map_secrets.sql`)
+
+- `map_tokens.secret_skill`, `secret_dt` e `secret_radius` (padrão 2 casas).
+- `map_token_reveals (token_id, user_id, campaign_id, roll_total)`:
+  - cada um lê as próprias descobertas; o mestre lê todas;
+  - ninguém grava direto.
+- Funções:
+  - `app_private.revealed_to_me(token)`;
+  - `app_private.reveal_secrets(...)`: só o servidor chama;
+  - `toggle_prop` e `can_view_asset` passam a considerar as descobertas.
+- A política `tokens_select` libera a peça oculta para quem a descobriu.
+
 ## Backups
 
 Supabase Pro: backups diários (ponto no tempo opcional, pago à parte). Além disso: dump lógico semanal para armazenamento externo e teste de restauração trimestral (Fase 9).

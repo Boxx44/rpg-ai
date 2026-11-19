@@ -274,3 +274,21 @@ _Regras completadas_
 - A peça sob o mouse decide o destino: a imagem dela, o retrato (no caso do jogador e do próprio personagem) ou o fundo do mapa.
 - A permissão continua sendo checada no servidor (RLS e regras de imagens da ADR-036).
 - O retrato salva na hora, com controle de versão, para não dar conflito ao salvar a ficha depois.
+
+**ADR-042 — Segredos revelados por jogador (migration 0011).**
+
+- **Colunas** em `map_tokens`: `secret_skill`, `secret_dt` e `secret_radius`.
+- **Tabela** `map_token_reveals` (peça + jogador).
+- **Quem vê:** a política `tokens_select` libera uma peça oculta só para quem tem uma descoberta registrada.
+- **Como a descoberta é gravada:** o teste é rolado no servidor pela regra do sistema (`buildCheck`) e fica no chat como mensagem secreta.
+  - Depois, a API chama `app_private.reveal_secrets` pela própria conexão; a função não pode ser chamada por usuários.
+  - A função confere tudo de novo: mapa compartilhado, perícia, DT alcançada e distância (casas entre as bordas, diagonal conta 1).
+- **Para o jogador**, a peça descoberta chega como visível e marcada `discovered`, sem DT nem perícia. O mestre recebe `secret` e `foundBy`.
+- `toggle_prop` e `can_view_asset` também consideram a descoberta.
+- **Para não entregar a existência do segredo:** o jogador escolhe a perícia ao procurar. Quando não acha nada, a resposta é a mesma, haja segredo ali ou não.
+
+**ADR-043 — Tokens 2D procedurais.**
+
+- Os bonecos são SVG gerados por código (`token-figure.tsx`), com aparência sorteada de forma fixa pelo id do token. Não usam imagens de terceiros.
+- A respiração usa animação CSS, que respeita "menos movimento".
+- Os testes rodam com `reducedMotion: 'reduce'`, para os cliques não esperarem animações infinitas.

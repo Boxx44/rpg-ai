@@ -1,6 +1,7 @@
 'use client';
 
 import {
+  type CampaignSystemDto,
   type CharacterDto,
   type MapDto,
   type MapSummaryDto,
@@ -40,6 +41,8 @@ import { accessToken } from '@/lib/supabase';
 import { MapCanvas, TERRAIN_STYLE } from './map-canvas';
 import { PropArt, PropDefs } from './map-props';
 import { ImagePicker } from './image-picker';
+import { SecretPanel } from './secret-panel';
+import { searchSkills } from '@/lib/skills';
 import { uploadAsset, useAssetUrl, usePasteImage } from '@/lib/assets';
 import { dismissToast, playSound, toast } from '@/lib/feedback';
 
@@ -186,11 +189,13 @@ export function MapEditor({
   maps: initialMaps,
   characters,
   npcs,
+  system = null,
 }: {
   campaignId: string;
   maps: MapSummaryDto[];
   characters: CharacterDto[];
   npcs: NpcDto[];
+  system?: CampaignSystemDto | null;
 }) {
   const router = useRouter();
   const [maps, setMaps] = useState(initialMaps);
@@ -386,6 +391,20 @@ export function MapEditor({
     if (!map) return;
     setMap({ ...map, tokens: map.tokens.map((k) => (k.id === t.id ? { ...k, x, y } : k)) });
     await call((tk) => api(`${base}/tokens/${t.id}/move`, tk, { method: 'POST', body: json({ x, y }) }));
+  }
+
+  /** Liga/atualiza/desliga o segredo da peça e recarrega o mapa (para ver quem já achou). */
+  async function saveSecret(
+    t: TokenDto,
+    patch: { hidden?: boolean; secretSkill: string | null; secretDt: number | null; secretRadius: number },
+  ) {
+    await call((tk) => api(`${base}/tokens/${t.id}`, tk, { method: 'PATCH', body: json(patch) }));
+    const m = await call((tk) => api<MapDto>(base, tk));
+    if (m) {
+      setMap(m);
+      setSelected(m.tokens.find((x) => x.id === t.id) ?? null);
+      toast(patch.secretSkill ? 'Segredo salvo' : 'Não é mais segredo', { tone: 'arcane', ms: 2000 });
+    }
   }
 
   async function toggleHidden(t: TokenDto) {
@@ -836,6 +855,14 @@ export function MapEditor({
                       }
                       value={selected.imageAsset}
                       onChange={(id) => setTokenImage(selected, id)}
+                    />
+                  )}
+                  {(selected.hidden || selected.secret) && (
+                    <SecretPanel
+                      key={`${selected.id}-${selected.secret?.skill}-${selected.secret?.dt}`}
+                      token={selected}
+                      skills={searchSkills(system)}
+                      onSave={(p) => saveSecret(selected, p)}
                     />
                   )}
                   <div className="flex flex-wrap gap-2">

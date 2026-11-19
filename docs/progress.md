@@ -22,6 +22,31 @@
 
 ---
 
+## 19/11/2026 — Mapa grande, tokens 2D e segredos no mapa
+
+**O que funciona (testado):**
+
+- **Mapa muito maior:**
+  - a mesa e o editor usam a largura toda da tela;
+  - o mapa ocupa a altura disponível e já abre ampliado do maior tamanho que cabe inteiro;
+  - zoom até 300%, botões + e − sobre o mapa, "Ajustar à tela" e **Tela cheia** (Esc sai).
+- **Tokens em 2D:** cada personagem virou um bonequinho desenhado, em pé sobre uma base, como uma miniatura de papel.
+  - Pele, cabelo e penteado mudam de token para token. A roupa usa a cor do token.
+  - O equipamento segue a classe: colete e arma no Combatente, mochila e lanterna no Especialista, livro brilhando no Ocultista. A primeira arma da ficha aparece na mão.
+  - NPCs usam casaco (alguns, óculos).
+  - Inimigos têm visual próprio pelo nome: zumbi, sombra, fera, cultista ou capanga.
+  - Com retrato enviado, o token vira um cartão em pé com a imagem.
+  - O boneco respira de leve e se levanta ao ser arrastado. Caído, fica deitado e sem cor. A barra de vida fica na base.
+  - Quem está mais embaixo no mapa aparece na frente.
+- **Segredos no mapa:**
+  - **No editor:** selecione uma peça oculta e preencha "Segredo": a perícia que encontra (ex.: Percepção, Investigação, Ocultismo), a DT e o alcance em casas.
+  - **Na mesa:** o jogador usa **Procurar ao redor**, escolhe a perícia e o servidor rola o teste do personagem. A rolagem é secreta: só ele e o mestre veem.
+  - **Se passar:** o objeto aparece **só para quem achou**, com brilho, faíscas e som, e ele pode usar o que achou (abrir o baú, por exemplo).
+  - **O mestre** é avisado ("Fulana encontrou algo") e vê no editor quem descobriu cada segredo.
+  - Serve para itens, pistas, armadilhas, portas, corpos e até inimigos escondidos.
+
+**Testes:** banco 58 (+6 segredos), API 91 (+6), ponta a ponta 54 (+3), shared 15, regras 57, lint e typecheck sem erros.
+
 ## 19/11/2026 — Mapas realistas e imagens fáceis
 
 **O que funciona (testado):**

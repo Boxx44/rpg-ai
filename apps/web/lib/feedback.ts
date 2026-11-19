@@ -91,7 +91,7 @@ export function prefersLessMotion(): boolean {
 // Sintetizados na hora (WebAudio): sem arquivos de áudio de terceiros.
 
 export type Sound =
-  'dice' | 'hit' | 'crit' | 'fail' | 'turn' | 'door' | 'notify' | 'click' | 'fire' | 'combat';
+  'dice' | 'hit' | 'crit' | 'fail' | 'turn' | 'door' | 'notify' | 'click' | 'fire' | 'combat' | 'discover';
 
 let ctx: AudioContext | null = null;
 
@@ -189,6 +189,11 @@ export function playSound(s: Sound) {
       break;
     case 'fire':
       noise(a, out, 0, 0.5, 0.2, 900);
+      break;
+    case 'discover':
+      // brilho mágico subindo
+      [784, 988, 1175, 1568, 1976].forEach((f, i) => tone(a, out, f, i * 0.07, 0.5, 'sine', 0.16));
+      noise(a, out, 0.05, 0.6, 0.06, 7000);
       break;
     case 'combat':
       // tambor grave + choque de lâminas

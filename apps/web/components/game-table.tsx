@@ -1,6 +1,7 @@
 'use client';
 
 import type {
+  SearchResultDto,
   CampaignRole,
   CampaignSystemDto,
   CharacterDto,
@@ -39,7 +40,9 @@ import { MapCanvas, type TokenDecoration } from './map-canvas';
 import { dismissToast, playSound, toast } from '@/lib/feedback';
 import { uploadAsset, usePasteImage } from '@/lib/assets';
 import { CombatBanner, CombatPanel } from './combat-panel';
+import { SearchAround } from './search-around';
 import { SessionBar } from './session-bar';
+import { searchSkills } from '@/lib/skills';
 import { QuickSheetPanel, RulesPanel } from './table-panels';
 
 export function GameTable({
@@ -183,6 +186,14 @@ export function GameTable({
       'npcs.changed': () => {
         void loadNpcs();
         void loadMap(mapId); // retrato do NPC pode ter mudado no token
+      },
+      'secret.found': (p: { mapId: string; found: { id: string; label: string }[]; by?: string }) => {
+        void loadMap(p.mapId);
+        // o mestre fica sabendo quem achou o quê (o próprio jogador já foi avisado pela resposta)
+        if (p.by && manager) {
+          playSound('notify');
+          toast(`${p.by} encontrou algo`, { body: p.found.map((f) => f.label).join(', '), tone: 'arcane' });
+        }
       },
       'prop.toggled': (p: {
         mapId: string;
@@ -397,6 +408,34 @@ export function GameTable({
   }, [tab, view]);
   const myTurn = !!shownCombat?.combatants.find((c) => c.id === shownCombat.currentId)?.mine && !manager;
 
+  // Procurar ao redor: meus personagens que estão neste mapa
+  const mineOnMap = useMemo(
+    () =>
+      (shownMap?.tokens ?? [])
+        .filter((t) => t.characterId && characters.some((c) => c.id === t.characterId && c.ownerId === myId))
+        .map((t) => ({ characterId: t.characterId!, name: t.label })),
+    [shownMap, characters, myId],
+  );
+  const [justFound, setJustFound] = useState<string[]>([]);
+  async function onSearched(r: SearchResultDto) {
+    if (!shownMap) return;
+    if (!r.found.length) {
+      toast('Você procurou, mas não encontrou nada', {
+        body: `Sua rolagem: ${r.total}. Ela aparece só para você e o mestre.`,
+      });
+      return;
+    }
+    await loadMap(shownMap.id);
+    setJustFound(r.found.map((f) => f.id));
+    setTimeout(() => setJustFound([]), 2600);
+    playSound('discover');
+    toast(`Você encontrou: ${r.found.map((f) => f.label).join(', ')}`, {
+      body: 'Só você está vendo. Conte ao grupo se quiser!',
+      tone: 'gold',
+      ms: 6000,
+    });
+  }
+
   /** De quem é o personagem deste token (para o jogador pôr o próprio retrato). */
   const ownCharacter = (t: TokenDto | null) =>
     t?.characterId ? characters.find((c) => c.id === t.characterId && c.ownerId === myId) : undefined;
@@ -530,7 +569,17 @@ export function GameTable({
             </Select>
           ) : null}
           {map && !map.shared && <Badge tone="gold">Oculto dos jogadores</Badge>}
-          <div className="ml-auto flex items-center gap-1">
+          <div className="ml-auto flex flex-wrap items-center justify-end gap-1">
+            {shownMap && mineOnMap.length > 0 && myRole !== 'spectator' && (
+              <SearchAround
+                campaignId={campaignId}
+                mapId={shownMap.id}
+                mine={mineOnMap}
+                skills={searchSkills(system)}
+                onResult={(r) => void onSearched(r)}
+                onError={setError}
+              />
+            )}
             <span
               className={cn(
                 'mr-2 inline-flex items-center gap-1 text-xs',
@@ -590,6 +639,7 @@ export function GameTable({
               selectedTokenId={focusToken}
               onSelectToken={(t) => setFocusToken(t.id)}
               onZoomChange={setZoom}
+              discovered={justFound}
               onDropImage={myRole === 'spectator' ? undefined : (f, t) => void placeImage(f, t)}
               dropHint={(t) =>
                 manager
