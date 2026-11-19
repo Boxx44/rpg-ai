@@ -6,7 +6,17 @@
  * sai de um "sorteio" fixo pelo id do token, então o mesmo token tem sempre o mesmo visual.
  * Desenho numa caixa 0–100 (a base fica no chão da casa; a cabeça sobe um pouco acima).
  */
-import { type Appearance, randomAppearance, type TokenDto } from '@rpg-ai/shared';
+import {
+  type Appearance,
+  LPC_ITEMS,
+  lpcColorOptions,
+  lpcFits,
+  type PixelLook,
+  randomAppearance,
+  randomPixel,
+  type TokenDto,
+} from '@rpg-ai/shared';
+import { useLpcFrame } from '../lib/lpc';
 import { AvatarFigure } from './avatar-figure';
 
 export type FigureRole = 'combatente' | 'especialista' | 'ocultista' | null;
@@ -343,6 +353,97 @@ function figureAppearance(
   return { ...base, top: { ...base.top, color: token.kind === 'npc' ? base.top.color : token.color } };
 }
 
+/** Personagem em pixel art que aparece no token (ou null para os desenhos próprios). */
+function pixelLook(
+  token: TokenDto,
+  role: FigureRole,
+  gear: FigureGear,
+  chosen?: Appearance | null,
+): PixelLook | null {
+  if (chosen?.pixel) return chosen.pixel;
+  const seed = token.id + token.label;
+  const part = (id: string, color: string[] = []) => ({ id, color });
+  if (token.kind === 'enemy') {
+    const look = enemyLook(token.label, hash(seed));
+    if (look === 'zombie')
+      return randomPixel(seed, {
+        body: 'male',
+        skin: 'zombie_green',
+        parts: {
+          head: part('heads_human_male_gaunt', ['zombie_green', 'red']),
+          top: part('torso_clothes_tshirt', ['forest']),
+          legs: part('legs_pants', ['brown']),
+          feet: part('feet_sandals', ['brown']),
+        },
+      });
+    if (look === 'cultist')
+      return randomPixel(seed, {
+        body: 'male',
+        parts: {
+          top: part('torso_clothes_longsleeve', ['black']),
+          cape: part('cape_tattered', ['maroon']),
+          hat: part('hat_hood_cloth', ['maroon']),
+          legs: part('legs_pants', ['black']),
+          feet: part('feet_boots_basic', ['black']),
+          weapon: part('weapon_sword_dagger', ['dagger']),
+        },
+      });
+    if (look === 'thug')
+      return randomPixel(seed, {
+        body: 'muscular',
+        parts: {
+          top: part('torso_aprons_suspenders', ['black']),
+          legs: part('legs_pants', ['charcoal']),
+          feet: part('feet_boots_revised', ['black']),
+          weapon: part('weapon_blunt_mace', ['mace']),
+        },
+      });
+    return null; // sombra e fera continuam com desenho próprio
+  }
+  const base = randomPixel(seed);
+  const weapon =
+    token.kind === 'npc'
+      ? null
+      : gear === 'ranged'
+        ? 'weapon_ranged_crossbow'
+        : gear === 'melee' || role === 'combatente'
+          ? 'weapon_sword_dagger'
+          : role === 'ocultista'
+            ? 'weapon_magic_gnarled'
+            : null;
+  const it = weapon ? LPC_ITEMS.get(weapon) : undefined;
+  if (it && lpcFits(it, base.body))
+    base.parts.weapon = { id: it.id, color: [lpcColorOptions(it)[0]?.[0] ?? ''] };
+  return base;
+}
+
+/** Personagem em pixel art de pé no token, respirando. */
+function PixelFigure({ look, down }: { look: PixelLook; down?: boolean }) {
+  const url = useLpcFrame(look);
+  if (!url) return null;
+  return (
+    <g
+      className={down ? undefined : 'animate-breathe-soft'}
+      style={{
+        transformOrigin: '50px 90px',
+        transformBox: 'view-box',
+        ...(down ? { filter: 'grayscale(1) brightness(0.7)' } : {}),
+      }}
+      transform={down ? 'rotate(-85 50 82) translate(-4 10)' : undefined}
+    >
+      <image
+        href={url}
+        x="-30"
+        y="-65"
+        width="160"
+        height="160"
+        style={{ imageRendering: 'pixelated' }}
+        data-pixel={[look.body, ...Object.values(look.parts).map((p) => p.id)].join(' ')}
+      />
+    </g>
+  );
+}
+
 export function TokenFigure({
   token,
   portrait,
@@ -376,7 +477,8 @@ export function TokenFigure({
   const style = h % 6;
   const pants = pick(PANTS, h, 9);
   const rim = token.kind === 'enemy' ? '#b4232f' : token.kind === 'npc' ? '#c9a24b' : '#7c4ff0';
-  const av = !portrait ? figureAppearance(token, role ?? null, gear ?? null, appearance) : null;
+  const pix = !portrait ? pixelLook(token, role ?? null, gear ?? null, appearance) : null;
+  const av = !portrait && !pix ? figureAppearance(token, role ?? null, gear ?? null, appearance) : null;
   const figure =
     portrait && portraitCutout ? (
       // arte recortada (fundo transparente): a própria figura em pé, respirando
@@ -420,6 +522,9 @@ export function TokenFigure({
         <rect x="25" y="7" width="50" height="66" rx="4" fill="url(#fg-card)" />
         <rect x="44" y="76" width="12" height="8" fill="#2a2430" />
       </g>
+    ) : pix ? (
+      // personagem em pixel art (peças LPC), de frente
+      <PixelFigure look={pix} down={down} />
     ) : av ? (
       // boneco ilustrado visto de cima (pés na base)
       <g transform="translate(50 92) scale(1.2) translate(-50 -151)">
@@ -449,7 +554,15 @@ export function TokenFigure({
   return (
     <g
       data-figure={
-        portrait ? (portraitCutout ? 'cutout' : 'card') : av ? 'avatar' : enemyLook(token.label, h)
+        portrait
+          ? portraitCutout
+            ? 'cutout'
+            : 'card'
+          : pix
+            ? 'pixel'
+            : av
+              ? 'avatar'
+              : enemyLook(token.label, h)
       }
     >
       {/* base no chão */}

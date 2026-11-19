@@ -1,177 +1,218 @@
 'use client';
 
+/**
+ * Aba "Aparência": criador de personagem em pixel art, como nos jogos de RPG.
+ * Escolha o corpo, a pele, o rosto, o cabelo, as roupas, os calçados e os acessórios,
+ * cada um com várias cores. As peças são da biblioteca aberta LPC (créditos em /creditos).
+ */
 import {
-  ACCESSORIES,
   type Appearance,
-  APPEARANCE_LABELS as LBL,
   appearanceSchema,
-  BODY_TYPES,
-  FRAMES,
-  BOTTOM_STYLES,
-  CLOTH_COLORS,
-  HAIR_COLORS,
-  HAIR_STYLES,
-  HELD_ITEMS,
-  randomAppearance,
-  SHOE_STYLES,
-  SKIN_TONES,
-  TOP_STYLES,
+  LPC,
+  LPC_BODIES,
+  LPC_ITEMS,
+  lpcColorLabel,
+  lpcColorOptions,
+  lpcFits,
+  lpcItemsFor,
+  type LpcBody,
+  type LpcItem,
+  type PixelLook,
+  pixelSchema,
+  lpcSwatch,
+  randomPixel,
 } from '@rpg-ai/shared';
 import { Button, cn } from '@rpg-ai/ui';
-import { Dices, RotateCcw } from 'lucide-react';
+import { Dices, RotateCcw, RotateCw } from 'lucide-react';
 import { useState } from 'react';
-import { AvatarFigure } from './avatar-figure';
+import { type LpcDir, useLpcFrame } from '../lib/lpc';
 
 type Section = 'corpo' | 'cabelo' | 'cima' | 'baixo' | 'pes' | 'extras';
-const SECTIONS: { key: Section; label: string }[] = [
-  { key: 'corpo', label: 'Corpo' },
-  { key: 'cabelo', label: 'Cabelo' },
-  { key: 'cima', label: 'Roupa de cima' },
-  { key: 'baixo', label: 'Roupa de baixo' },
-  { key: 'pes', label: 'Calçados' },
-  { key: 'extras', label: 'Acessórios e itens' },
+const SECTIONS: { key: Section; label: string; slots: string[] }[] = [
+  { key: 'corpo', label: 'Corpo', slots: ['head', 'beard'] },
+  { key: 'cabelo', label: 'Cabelo', slots: ['hair'] },
+  { key: 'cima', label: 'Roupa de cima', slots: ['top', 'jacket', 'belt'] },
+  { key: 'baixo', label: 'Roupa de baixo', slots: ['legs'] },
+  { key: 'pes', label: 'Calçados', slots: ['feet'] },
+  { key: 'extras', label: 'Acessórios e itens', slots: ['hat', 'face', 'neck', 'gloves', 'cape', 'weapon'] },
 ];
+const NONE_LABEL: Record<string, string> = {
+  hair: 'Careca',
+  beard: 'Sem barba',
+  top: 'Sem camisa',
+  jacket: 'Sem casaco',
+  belt: 'Sem cinto',
+  legs: 'Nada',
+  feet: 'Descalço',
+  hat: 'Nada',
+  face: 'Nada',
+  neck: 'Nada',
+  gloves: 'Sem luvas',
+  cape: 'Sem capa',
+  weapon: 'Mãos livres',
+};
+const COLOR_TITLE: Record<string, string[]> = {
+  head: ['Pele', 'Cor dos olhos'],
+  hair: ['Cor do cabelo'],
+  beard: ['Cor da barba'],
+};
 
-function Thumb({ a, crop = 'full' }: { a: Appearance; crop?: 'full' | 'head' | 'legs' | 'torso' }) {
-  const vb =
-    crop === 'head'
-      ? '34 0 32 37'
-      : crop === 'legs'
-        ? '26 78 48 76'
-        : crop === 'torso'
-          ? '24 26 52 70'
-          : '20 -3 60 158';
-  return (
-    <svg viewBox={vb} className="size-full" aria-hidden>
-      <AvatarFigure a={a} still />
-    </svg>
+const PREFERRED = ['charcoal', 'black', 'dark_brown', 'brown', 'gray'];
+/** Cores ao trocar de peça: mantém a cor que já estava, se servir; senão uma cor neutra. */
+function pickColors(it: LpcItem, keep?: string[]): string[] {
+  return lpcColorOptions(it).map((o, i) => {
+    const k = keep?.[i];
+    if (k && o.includes(k)) return k;
+    return PREFERRED.find((c) => o.includes(c)) ?? o[0]!;
+  });
+}
+
+/** Ajusta o personagem depois de trocar o corpo: tira o que não serve e mantém pele e rosto. */
+function normalize(p: PixelLook): PixelLook {
+  const parts = { ...p.parts };
+  for (const [slot, part] of Object.entries(parts)) {
+    const it = LPC_ITEMS.get(part.id);
+    if (!it || !lpcFits(it, p.body)) delete parts[slot];
+  }
+  if (!parts.head) {
+    const h = lpcItemsFor('head', p.body)[p.body === 'female' ? 1 : 0] ?? lpcItemsFor('head', p.body)[0];
+    if (h) parts.head = { id: h.id, color: [p.skin, 'brown'] };
+  }
+  if (parts.head) parts.head = { ...parts.head, color: [p.skin, parts.head.color[1] ?? 'brown'] };
+  return pixelSchema.parse({ ...p, parts });
+}
+
+function Sprite({
+  look,
+  dir = 2,
+  className,
+  testId,
+}: {
+  look: PixelLook;
+  dir?: LpcDir;
+  className?: string;
+  testId?: string;
+}) {
+  const url = useLpcFrame(look, dir);
+  return url ? (
+    <img
+      src={url}
+      alt=""
+      className={className}
+      style={{ imageRendering: 'pixelated' }}
+      data-testid={testId}
+      data-pixel={[look.body, ...Object.values(look.parts).map((p) => p.id)].join(' ')}
+    />
+  ) : (
+    <span className={cn('block animate-pulse rounded bg-white/5', className)} data-testid={testId} />
   );
 }
 
-function Swatches({
-  label,
-  colors,
-  value,
+function ItemGrid({
+  title,
+  slot,
+  look,
   onPick,
-  allowNone,
+  none,
 }: {
-  label: string;
-  colors: string[];
-  value: string | null;
-  onPick: (c: string | null) => void;
-  allowNone?: boolean;
+  title: string;
+  slot: string;
+  look: PixelLook;
+  onPick: (it: LpcItem | null) => void;
+  none?: string;
 }) {
+  const items = lpcItemsFor(slot, look.body);
+  if (!items.length) return null;
+  const current = look.parts[slot]?.id ?? null;
+  const preview = (it: LpcItem | null): PixelLook => {
+    const parts = { ...look.parts };
+    if (it) {
+      const old = parts[slot];
+      parts[slot] = { id: it.id, color: pickColors(it, old?.color) };
+    } else delete parts[slot];
+    return normalize({ ...look, parts });
+  };
+  const options: (LpcItem | null)[] = none ? [null, ...items] : items;
   return (
     <div className="space-y-1.5">
-      <p className="text-xs font-medium uppercase tracking-wider text-ink-faint">{label}</p>
-      <div className="flex flex-wrap items-center gap-1.5" role="radiogroup" aria-label={label}>
-        {allowNone && (
-          <button
-            type="button"
-            role="radio"
-            aria-checked={value === null}
-            aria-label="Nenhuma"
-            title="Nenhuma"
-            onClick={() => onPick(null)}
-            className={cn(
-              'grid size-7 place-items-center rounded-full border text-[10px] text-ink-faint',
-              value === null ? 'border-gold ring-2 ring-gold/50' : 'border-line',
-            )}
-          >
-            ∅
-          </button>
-        )}
-        {colors.map((c) => (
+      <p className="text-xs font-medium uppercase tracking-wider text-ink-faint">{title}</p>
+      <div
+        className="grid grid-cols-4 gap-2 sm:grid-cols-6 xl:grid-cols-8"
+        role="radiogroup"
+        aria-label={title}
+      >
+        {options.map((it) => {
+          const id = it?.id ?? null;
+          const label = it?.label ?? none!;
+          return (
+            <button
+              key={id ?? 'none'}
+              type="button"
+              role="radio"
+              aria-checked={current === id}
+              aria-label={label}
+              title={label}
+              onClick={() => onPick(it)}
+              data-option={id ?? 'none'}
+              className={cn(
+                'flex flex-col items-center gap-0.5 rounded-lg border p-1 text-[11px] transition-colors',
+                current === id
+                  ? 'border-gold/70 bg-gold/10 text-gold-bright'
+                  : 'border-line text-ink-muted hover:border-arcane-500/60 hover:text-ink',
+              )}
+            >
+              <span className="block h-14 w-full overflow-hidden rounded bg-[#2a2433]">
+                <Sprite look={preview(it)} className="mx-auto -mt-1 h-16 w-16" />
+              </span>
+              <span className="w-full truncate">{label}</span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function Colors({
+  title,
+  item,
+  index,
+  value,
+  onPick,
+}: {
+  title: string;
+  item: LpcItem;
+  index: number;
+  value: string | undefined;
+  onPick: (c: string) => void;
+}) {
+  const opts = lpcColorOptions(item)[index] ?? [];
+  if (opts.length < 2) return null;
+  return (
+    <div className="space-y-1.5">
+      <p className="text-xs font-medium uppercase tracking-wider text-ink-faint">{title}</p>
+      <div className="flex flex-wrap gap-1.5" role="radiogroup" aria-label={title}>
+        {opts.map((c) => (
           <button
             key={c}
             type="button"
             role="radio"
-            aria-checked={value?.toLowerCase() === c.toLowerCase()}
-            aria-label={`Cor ${c}`}
-            title={c}
+            aria-checked={value === c}
+            aria-label={`Cor ${lpcColorLabel(c)}`}
+            title={lpcColorLabel(c)}
             onClick={() => onPick(c)}
             className={cn(
               'size-7 rounded-full border transition-transform hover:scale-110',
-              value?.toLowerCase() === c.toLowerCase()
-                ? 'scale-110 border-gold ring-2 ring-gold/60'
-                : 'border-black/40',
+              value === c ? 'scale-110 border-gold ring-2 ring-gold/60' : 'border-black/40',
             )}
-            style={{ background: c }}
+            style={{ background: lpcSwatch(item, index, c) }}
           />
-        ))}
-        <label
-          className="relative grid size-7 cursor-pointer place-items-center overflow-hidden rounded-full border border-dashed border-line text-xs text-ink-muted"
-          title="Outra cor"
-        >
-          +
-          <input
-            type="color"
-            value={value ?? '#888888'}
-            onChange={(e) => onPick(e.target.value)}
-            className="absolute inset-0 cursor-pointer opacity-0"
-            aria-label={`${label}: outra cor`}
-          />
-        </label>
-      </div>
-    </div>
-  );
-}
-
-function Options<T extends string>({
-  label,
-  options,
-  value,
-  labels,
-  preview,
-  onPick,
-  crop,
-}: {
-  label: string;
-  options: readonly T[];
-  value: T;
-  labels: Record<T, string>;
-  preview: (o: T) => Appearance;
-  onPick: (o: T) => void;
-  crop?: 'full' | 'head' | 'legs' | 'torso';
-}) {
-  return (
-    <div className="space-y-1.5">
-      <p className="text-xs font-medium uppercase tracking-wider text-ink-faint">{label}</p>
-      <div
-        className="grid grid-cols-3 gap-2 sm:grid-cols-4 xl:grid-cols-6"
-        role="radiogroup"
-        aria-label={label}
-      >
-        {options.map((o) => (
-          <button
-            key={o}
-            type="button"
-            role="radio"
-            aria-checked={value === o}
-            onClick={() => onPick(o)}
-            data-option={o}
-            className={cn(
-              'flex flex-col items-center gap-1 rounded-lg border p-1.5 text-[11px] transition-colors',
-              value === o
-                ? 'border-gold/70 bg-gold/10 text-gold-bright'
-                : 'border-line text-ink-muted hover:border-arcane-500/60 hover:text-ink',
-            )}
-          >
-            <span className="block h-16 w-full rounded bg-[#2a2433]">
-              <Thumb a={preview(o)} crop={crop} />
-            </span>
-            <span className="w-full truncate">{labels[o]}</span>
-          </button>
         ))}
       </div>
     </div>
   );
 }
 
-/**
- * Aba "Aparência": monta o boneco 2D do personagem escolhendo corpo, pele, cabelo,
- * roupas, calçados, acessórios e item na mão, cada um com várias cores.
- */
 export function AppearanceEditor({
   value,
   seed,
@@ -179,42 +220,65 @@ export function AppearanceEditor({
   readOnly,
 }: {
   value: Appearance | null;
-  /** Semente para a aparência inicial sorteada (quando ainda não há uma). */
+  /** Semente para o personagem inicial sorteado (quando ainda não há um). */
   seed: string;
   onChange: (a: Appearance) => void;
   readOnly?: boolean;
 }) {
-  const a = value ?? randomAppearance(seed);
+  const look = value?.pixel ?? randomPixel(seed);
   const [section, setSection] = useState<Section>('corpo');
-  const set = (patch: Partial<Appearance>) => onChange(appearanceSchema.parse({ ...a, ...patch }));
-  const accToggle = (x: (typeof ACCESSORIES)[number]) => {
-    const has = a.accessories.includes(x);
-    const next = has ? a.accessories.filter((y) => y !== x) : [...a.accessories, x].slice(-6);
-    set({ accessories: next });
+  const [dir, setDir] = useState<LpcDir>(2);
+  const save = (p: PixelLook) => onChange(appearanceSchema.parse({ ...(value ?? {}), pixel: normalize(p) }));
+  const setPart = (slot: string, it: LpcItem | null) => {
+    const parts = { ...look.parts };
+    if (it) {
+      const old = parts[slot];
+      parts[slot] = { id: it.id, color: pickColors(it, old?.color) };
+    } else delete parts[slot];
+    save({ ...look, parts });
   };
+  const setColor = (slot: string, i: number, c: string) => {
+    const part = look.parts[slot];
+    if (!part) return;
+    const color = [...part.color];
+    color[i] = c;
+    if (slot === 'head' && i === 0) return save({ ...look, skin: c });
+    save({ ...look, parts: { ...look.parts, [slot]: { ...part, color } } });
+  };
+  const sec = SECTIONS.find((s) => s.key === section)!;
+  const turn = (d: number) => setDir(((((dir + d) % 4) + 4) % 4) as LpcDir);
+  const bodyItem = LPC_ITEMS.get('body')!;
+
   return (
     <div
       className={cn('grid gap-6 lg:grid-cols-[280px_1fr]', readOnly && 'pointer-events-none opacity-80')}
       data-testid="appearance-editor"
     >
       <div className="space-y-3">
-        <div className="relative overflow-hidden rounded-xl border border-line bg-[radial-gradient(circle_at_50%_30%,#3a3046,#16131d)]">
-          <svg
-            viewBox="14 -4 72 160"
-            className="mx-auto h-[380px] w-full"
-            role="img"
-            aria-label="Prévia do boneco"
-            data-testid="appearance-preview"
-          >
-            <AvatarFigure a={a} />
-          </svg>
+        <div className="relative overflow-hidden rounded-xl border border-line bg-[radial-gradient(circle_at_50%_35%,#3a3046,#16131d)]">
+          <div className="animate-breathe-soft" style={{ transformOrigin: '50% 92%' }}>
+            <Sprite
+              look={look}
+              dir={dir}
+              className="mx-auto h-[300px] w-[300px] max-w-full"
+              testId="appearance-preview"
+            />
+          </div>
+          <div className="absolute bottom-2 right-2 flex gap-1">
+            <Button variant="ghost" size="sm" onClick={() => turn(1)} aria-label="Girar para a esquerda">
+              <RotateCcw />
+            </Button>
+            <Button variant="ghost" size="sm" onClick={() => turn(-1)} aria-label="Girar para a direita">
+              <RotateCw />
+            </Button>
+          </div>
         </div>
         <div className="flex gap-2">
           <Button
             variant="secondary"
             size="sm"
             className="flex-1"
-            onClick={() => onChange(randomAppearance(`${seed}-${Date.now()}`))}
+            onClick={() => save(randomPixel(`${seed}-${Date.now()}`))}
             data-testid="appearance-random"
           >
             <Dices /> Aleatório
@@ -222,15 +286,18 @@ export function AppearanceEditor({
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => onChange(randomAppearance(seed))}
-            title="Voltar à aparência inicial"
+            onClick={() => save(randomPixel(seed))}
+            title="Voltar ao personagem inicial"
           >
             <RotateCcw />
           </Button>
         </div>
         <p className="text-xs text-ink-faint">
-          É assim que o personagem aparece no mapa, respirando. Para usar um desenho seu, envie uma imagem de
-          corpo inteiro no retrato.
+          É assim que o personagem aparece no mapa, respirando. Arte em pixel da biblioteca aberta LPC —{' '}
+          <a href="/creditos" className="underline" target="_blank">
+            créditos dos artistas
+          </a>
+          .
         </p>
       </div>
       <div className="space-y-4">
@@ -255,208 +322,74 @@ export function AppearanceEditor({
             </button>
           ))}
         </div>
+
         {section === 'corpo' && (
           <>
-            <Options
-              label="Silhueta"
-              options={FRAMES}
-              value={a.frame}
-              labels={LBL.frame}
-              preview={(o) => ({ ...a, frame: o })}
-              onPick={(o) => set({ frame: o })}
-            />
-            <Options
-              label="Tipo de corpo"
-              options={BODY_TYPES}
-              value={a.body}
-              labels={LBL.body}
-              preview={(o) => ({ ...a, body: o })}
-              onPick={(o) => set({ body: o })}
-            />
-            <Swatches
-              label="Tom de pele"
-              colors={SKIN_TONES}
-              value={a.skin}
-              onPick={(c) => set({ skin: c ?? a.skin })}
-            />
-            <Swatches
-              label="Cor dos olhos"
-              colors={[
-                '#3b2a1a',
-                '#6a4a2a',
-                '#2a4a6a',
-                '#3a5a3a',
-                '#6a6a72',
-                '#8c1f2b',
-                '#c9a24b',
-                '#121116',
-              ]}
-              value={a.eyes}
-              onPick={(c) => set({ eyes: c ?? a.eyes })}
-            />
-          </>
-        )}
-        {section === 'cabelo' && (
-          <>
-            <Options
-              label="Corte"
-              options={HAIR_STYLES}
-              value={a.hair.style}
-              labels={LBL.hair}
-              crop="head"
-              preview={(o) => ({
-                ...a,
-                hair: { ...a.hair, style: o },
-                accessories: a.accessories.filter((x) => x !== 'caveira'),
-              })}
-              onPick={(o) => set({ hair: { ...a.hair, style: o } })}
-            />
-            <Swatches
-              label="Cor do cabelo"
-              colors={HAIR_COLORS}
-              value={a.hair.color}
-              onPick={(c) => set({ hair: { ...a.hair, color: c ?? a.hair.color } })}
-            />
-            <Swatches
-              label="Mecha colorida"
-              colors={['#c43a4a', '#e9e2d4', '#6a2a8c', '#2a4a9c', '#2f7a5a', '#e86aa8', '#c9a24b']}
-              value={a.hair.streak}
-              allowNone
-              onPick={(c) => set({ hair: { ...a.hair, streak: c } })}
-            />
-          </>
-        )}
-        {section === 'cima' && (
-          <>
-            <Options
-              label="Peça"
-              options={TOP_STYLES}
-              value={a.top.style}
-              labels={LBL.top}
-              preview={(o) => ({ ...a, top: { ...a.top, style: o } })}
-              crop="torso"
-              onPick={(o) => set({ top: { ...a.top, style: o } })}
-            />
-            <Swatches
-              label="Cor principal"
-              colors={CLOTH_COLORS}
-              value={a.top.color}
-              onPick={(c) => set({ top: { ...a.top, color: c ?? a.top.color } })}
-            />
-            <Swatches
-              label="Cor de detalhe"
-              colors={CLOTH_COLORS}
-              value={a.top.accent}
-              onPick={(c) => set({ top: { ...a.top, accent: c ?? a.top.accent } })}
-            />
-            {(a.top.style === 'moletom' || a.top.style === 'manto') && (
-              <label className="flex items-center gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  checked={a.hood || a.top.style === 'manto'}
-                  disabled={a.top.style === 'manto'}
-                  onChange={(e) => set({ hood: e.target.checked })}
-                  className="accent-[var(--color-gold)]"
-                />
-                Capuz levantado
-              </label>
-            )}
-          </>
-        )}
-        {section === 'baixo' && (
-          <>
-            <Options
-              label="Peça"
-              options={BOTTOM_STYLES}
-              value={a.bottom.style}
-              labels={LBL.bottom}
-              crop="legs"
-              preview={(o) => ({ ...a, bottom: { ...a.bottom, style: o } })}
-              onPick={(o) => set({ bottom: { ...a.bottom, style: o } })}
-            />
-            <Swatches
-              label="Cor"
-              colors={CLOTH_COLORS}
-              value={a.bottom.color}
-              onPick={(c) => set({ bottom: { ...a.bottom, color: c ?? a.bottom.color } })}
-            />
-          </>
-        )}
-        {section === 'pes' && (
-          <>
-            <Options
-              label="Calçado"
-              options={SHOE_STYLES}
-              value={a.shoes.style}
-              labels={LBL.shoes}
-              crop="legs"
-              preview={(o) => ({ ...a, shoes: { ...a.shoes, style: o } })}
-              onPick={(o) => set({ shoes: { ...a.shoes, style: o } })}
-            />
-            <Swatches
-              label="Cor"
-              colors={CLOTH_COLORS}
-              value={a.shoes.color}
-              onPick={(c) => set({ shoes: { ...a.shoes, color: c ?? a.shoes.color } })}
-            />
-          </>
-        )}
-        {section === 'extras' && (
-          <>
             <div className="space-y-1.5">
-              <p className="text-xs font-medium uppercase tracking-wider text-ink-faint">
-                Acessórios (até 6)
-              </p>
-              <div className="grid grid-cols-3 gap-2 sm:grid-cols-4" role="group" aria-label="Acessórios">
-                {ACCESSORIES.map((x) => (
+              <p className="text-xs font-medium uppercase tracking-wider text-ink-faint">Tipo de corpo</p>
+              <div className="grid grid-cols-4 gap-2" role="radiogroup" aria-label="Tipo de corpo">
+                {LPC_BODIES.map((b: LpcBody) => (
                   <button
-                    key={x}
+                    key={b}
                     type="button"
-                    aria-pressed={a.accessories.includes(x)}
-                    onClick={() => accToggle(x)}
-                    data-option={x}
+                    role="radio"
+                    aria-checked={look.body === b}
+                    aria-label={LPC.bodies[b]}
+                    onClick={() => save({ ...look, body: b })}
+                    data-option={b}
                     className={cn(
-                      'flex flex-col items-center gap-1 rounded-lg border p-1.5 text-[11px]',
-                      a.accessories.includes(x)
+                      'flex flex-col items-center gap-0.5 rounded-lg border p-1 text-[11px]',
+                      look.body === b
                         ? 'border-gold/70 bg-gold/10 text-gold-bright'
-                        : 'border-line text-ink-muted hover:text-ink',
+                        : 'border-line text-ink-muted hover:border-arcane-500/60 hover:text-ink',
                     )}
                   >
-                    <span className="block h-16 w-full rounded bg-[#2a2433]">
-                      <Thumb
-                        a={{ ...a, accessories: [x] }}
-                        crop={
-                          ['caveira', 'oculos', 'venda', 'cicatriz', 'brincos'].includes(x)
-                            ? 'head'
-                            : [
-                                  'colar',
-                                  'pingente',
-                                  'cachecol',
-                                  'tatuagem',
-                                  'luvas',
-                                  'cinto',
-                                  'correntes',
-                                ].includes(x)
-                              ? 'torso'
-                              : 'full'
-                        }
-                      />
+                    <span className="block h-16 w-full overflow-hidden rounded bg-[#2a2433]">
+                      <Sprite look={normalize({ ...look, body: b })} className="mx-auto h-16 w-16" />
                     </span>
-                    <span className="w-full truncate">{LBL.accessories[x]}</span>
+                    {LPC.bodies[b]}
                   </button>
                 ))}
               </div>
             </div>
-            <Options
-              label="Na mão"
-              options={HELD_ITEMS}
-              value={a.held}
-              labels={LBL.held}
-              preview={(o) => ({ ...a, held: o })}
-              onPick={(o) => set({ held: o })}
+            <Colors
+              title="Pele"
+              item={bodyItem}
+              index={0}
+              value={look.skin}
+              onPick={(c) => save({ ...look, skin: c })}
             />
           </>
         )}
+
+        {sec.slots.map((slot) => {
+          const part = look.parts[slot];
+          const it = part ? LPC_ITEMS.get(part.id) : undefined;
+          return (
+            <div key={slot} className="space-y-3">
+              <ItemGrid
+                title={LPC.slots[slot] ?? slot}
+                slot={slot}
+                look={look}
+                onPick={(x) => setPart(slot, x)}
+                none={slot === 'head' ? undefined : NONE_LABEL[slot]}
+              />
+              {it &&
+                lpcColorOptions(it).map((_, i) =>
+                  slot === 'head' && i === 0 ? null : (
+                    <Colors
+                      key={i}
+                      title={COLOR_TITLE[slot]?.[i] ?? `Cor — ${LPC.slots[slot] ?? it.label}`}
+                      item={it}
+                      index={i}
+                      value={part?.color[i]}
+                      onPick={(c) => setColor(slot, i, c)}
+                    />
+                  ),
+                )}
+            </div>
+          );
+        })}
       </div>
     </div>
   );

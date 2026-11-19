@@ -99,10 +99,25 @@ test('biblioteca: criação guiada passo a passo e levar para a campanha', async
   // Passo "Aparência": monta o boneco 2D
   const ap = page.getByTestId('appearance-editor');
   await expect(ap).toBeVisible();
+  await ap
+    .getByRole('radiogroup', { name: 'Tipo de corpo' })
+    .getByRole('radio', { name: 'Feminino' })
+    .click();
+  await expect(ap.getByTestId('appearance-preview')).toHaveAttribute('data-pixel', /^female /);
   await ap.getByRole('tab', { name: 'Cabelo' }).click();
-  await ap.getByRole('radio', { name: 'Coque' }).click();
-  await ap.getByRole('radiogroup', { name: 'Cor do cabelo' }).getByRole('radio', { name: 'Cor #9e2a1e' }).click();
-  await expect(ap.getByTestId('appearance-preview').locator('[data-avatar]')).toHaveAttribute('data-avatar', /-coque-/);
+  await ap.getByRole('radio', { name: 'Chanel', exact: true }).click();
+  await ap
+    .getByRole('radiogroup', { name: 'Cor do cabelo' })
+    .getByRole('radio', { name: 'Cor Ruiva', exact: true })
+    .click();
+  await expect(ap.getByTestId('appearance-preview')).toHaveAttribute('data-pixel', /hair_bob\b/);
+  await ap.getByRole('tab', { name: 'Roupa de cima' }).click();
+  await ap
+    .getByRole('radiogroup', { name: 'Roupa de cima' })
+    .getByRole('radio', { name: 'Camiseta', exact: true })
+    .click();
+  await expect(ap.getByTestId('appearance-preview')).toHaveAttribute('data-pixel', /torso_clothes_tshirt\b/);
+  await page.screenshot({ path: 'test-results/screens/appearance-pixel.png' });
   await page.getByRole('button', { name: 'Próximo' }).click();
   await expect(page.getByTestId('g-review')).toContainText('Bia Torres');
   await expect(page.getByTestId('g-review')).toContainText('Pistola');
@@ -114,7 +129,7 @@ test('biblioteca: criação guiada passo a passo e levar para a campanha', async
   await page.screenshot({ path: 'test-results/screens/help-bubble.png' });
   // a aparência escolhida veio junto para a ficha
   await page.getByRole('tab', { name: 'Aparência' }).click();
-  await expect(page.getByTestId('appearance-preview').locator('[data-avatar]')).toHaveAttribute('data-avatar', /-coque-/);
+  await expect(page.getByTestId('appearance-preview')).toHaveAttribute('data-pixel', /hair_bob\b/);
   await page.getByRole('tab', { name: 'Ficha' }).click();
   await page.getByRole('button', { name: 'Salvar ficha' }).click();
   const card = page.getByTestId('library-card').filter({ hasText: 'Bia Torres' });

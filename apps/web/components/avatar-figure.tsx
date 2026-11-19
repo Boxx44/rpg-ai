@@ -142,7 +142,7 @@ function Paint({
   lw = 0.5,
   flat = false,
   opacity,
-  cel = 1.3,
+  cel = 1.0,
 }: {
   name: string;
   d: string;
@@ -165,24 +165,19 @@ function Paint({
         <>
           <mask id={`${cid}-s`} maskUnits="userSpaceOnUse" x="-20" y="-20" width="140" height="200">
             <path d={d} fill="#fff" />
-            <path d={d} fill="#000" transform={`translate(${-cel} ${-cel * 0.3})`} />
-          </mask>
-          <mask id={`${cid}-h`} maskUnits="userSpaceOnUse" x="-20" y="-20" width="140" height="200">
-            <path d={d} fill="#fff" />
-            <path d={d} fill="#000" transform={`translate(${cel * 0.35} ${cel * 0.12})`} />
+            <path d={d} fill="#000" transform={`translate(${-cel * 0.75} ${-cel * 0.55})`} />
           </mask>
         </>
       )}
       <path d={d} fill={fill} />
-      {!flat && <path d={d} fill={dark(mix(fill, '#3a1d4a', 0.25), 0.3)} mask={`url(#${cid}-s)`} />}
-      {!flat && <path d={d} fill={light(fill, 0.22)} mask={`url(#${cid}-h)`} />}
+      {!flat && <path d={d} fill={dark(mix(fill, '#5a2a6a', 0.22), 0.2)} mask={`url(#${cid}-s)`} />}
       <g clipPath={`url(#${cid})`}>{children}</g>
       {line && (
         <path
           d={d}
           fill="none"
-          stroke={mix(fill, INK, 0.9)}
-          strokeWidth={lw * 1.12}
+          stroke={mix(dark(fill, 0.55), INK, 0.55)}
+          strokeWidth={lw * 0.8}
           strokeLinejoin="round"
           strokeLinecap="round"
         />
