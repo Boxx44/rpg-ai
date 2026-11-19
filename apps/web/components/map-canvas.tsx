@@ -1,6 +1,7 @@
 'use client';
 
 import {
+  type Appearance,
   gridDistance,
   type MapDto,
   PROPS,
@@ -13,7 +14,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { FLAT_PROPS, PROP_LIGHT, PropArt, PropDefs } from './map-props';
 import { FigureDefs, type FigureGear, type FigureRole, TokenFigure } from './token-figure';
 import { TEXTURE_CELLS, type TextureKind, useTextures } from '@/lib/textures';
-import { draggingFiles, imageFrom, useAssetUrls } from '@/lib/assets';
+import { draggingFiles, imageFrom, useAssetUrls, useCutouts } from '@/lib/assets';
 import { prefersLessMotion } from '@/lib/feedback';
 
 export const CELL = 40;
@@ -79,6 +80,8 @@ export interface TokenDecoration {
   role?: FigureRole;
   /** Primeira arma da ficha: corpo a corpo ou à distância. */
   gear?: FigureGear;
+  /** Aparência escolhida na ficha (boneco 2D). */
+  appearance?: Appearance | null;
 }
 
 export interface MapCanvasProps {
@@ -195,6 +198,10 @@ export function MapCanvas({
   const tex = useTextures();
   const urls = useAssetUrls(map.campaignId, [map.backgroundAsset, ...map.tokens.map((t) => t.image)]);
   const bg = map.backgroundAsset ? urls[map.backgroundAsset] : undefined;
+  // imagens de token com fundo transparente viram figura recortada
+  const tokenUrls: Record<string, string> = {};
+  for (const t of map.tokens) if (t.image && urls[t.image] && !isProp(t)) tokenUrls[t.image] = urls[t.image]!;
+  const cutouts = useCutouts(tokenUrls);
 
   // Leva a vista até a peça da vez (ou a escolhida na barra de iniciativa).
   const turnId = Object.entries(decorations ?? {}).find(([, d]) => d.turn)?.[0];
@@ -932,6 +939,8 @@ export function MapCanvas({
                     <TokenFigure
                       token={t}
                       portrait={t.image ? urls[t.image] : undefined}
+                      portraitCutout={!!t.image && cutouts.has(t.image)}
+                      appearance={deco?.appearance ?? null}
                       role={deco?.role ?? null}
                       gear={deco?.gear ?? null}
                       down={down}

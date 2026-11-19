@@ -35,10 +35,10 @@ import {
   UserPlus,
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { api, json } from '@/lib/api';
 import { accessToken } from '@/lib/supabase';
-import { MapCanvas, TERRAIN_STYLE } from './map-canvas';
+import { MapCanvas, TERRAIN_STYLE, type TokenDecoration } from './map-canvas';
 import { PropArt, PropDefs } from './map-props';
 import { ImagePicker } from './image-picker';
 import { SecretPanel } from './secret-panel';
@@ -431,6 +431,21 @@ export function MapEditor({
   }
 
   const [showNew, setShowNew] = useState(false);
+  // aparência dos personagens (boneco 2D) também no editor
+  const editorDecorations = useMemo(() => {
+    const out: Record<string, TokenDecoration> = {};
+    for (const t of map?.tokens ?? []) {
+      const ch = t.characterId ? characters.find((c) => c.id === t.characterId) : undefined;
+      if (!ch) continue;
+      const cls = ch.sheet.system?.fields?.classe;
+      out[t.id] = {
+        appearance: ch.sheet.appearance ?? null,
+        role: cls === 'combatente' || cls === 'especialista' || cls === 'ocultista' ? cls : null,
+        gear: ch.sheet.system?.weapons?.[0]?.kind ?? null,
+      };
+    }
+    return out;
+  }, [map, characters]);
   const toolBtn = (active: boolean) =>
     cn(
       'inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs transition-colors',
@@ -590,6 +605,7 @@ export function MapEditor({
               zoom={zoom}
               onZoomChange={setZoom}
               onDropImage={(f, target) => void placeImage(f, target)}
+              decorations={editorDecorations}
               className="h-[calc(100dvh-16rem)] min-h-[520px]"
               canMove={() => tool.kind === 'select'}
               onMove={onMove}

@@ -6,7 +6,8 @@
  * sai de um "sorteio" fixo pelo id do token, então o mesmo token tem sempre o mesmo visual.
  * Desenho numa caixa 0–100 (a base fica no chão da casa; a cabeça sobe um pouco acima).
  */
-import type { TokenDto } from '@rpg-ai/shared';
+import { type Appearance, randomAppearance, type TokenDto } from '@rpg-ai/shared';
+import { AvatarFigure } from './avatar-figure';
 
 export type FigureRole = 'combatente' | 'especialista' | 'ocultista' | null;
 export type FigureGear = 'melee' | 'ranged' | null;
@@ -287,9 +288,66 @@ function Enemy({ look, color }: { look: EnemyLook; color: string }) {
 }
 
 /** Boneco 2D de um token (personagem, NPC ou inimigo). */
+/** Aparência do boneco: a escolhida na ficha ou uma sorteada (fixa) com o equipamento da classe. */
+function figureAppearance(
+  token: TokenDto,
+  role: FigureRole,
+  gear: FigureGear,
+  chosen?: Appearance | null,
+): Appearance | null {
+  if (chosen) return chosen;
+  const seed = token.id + token.label;
+  if (token.kind === 'enemy') {
+    const look = enemyLook(token.label, hash(seed));
+    if (look === 'zombie')
+      return randomAppearance(seed, {
+        skin: '#8fae7a',
+        eyes: '#d9e86a',
+        top: { style: 'camiseta', color: '#4f5a3a', accent: '#5a1a22' },
+        bottom: { style: 'calca', color: '#3a3428' },
+        shoes: { style: 'descalco', color: '#3a3428' },
+        accessories: ['cicatriz'],
+        held: 'nenhum',
+      });
+    if (look === 'cultist')
+      return randomAppearance(seed, {
+        top: { style: 'manto', color: '#2a1420', accent: '#8c1f2b' },
+        accessories: ['caveira'],
+        held: 'faca',
+        hood: true,
+      });
+    if (look === 'thug')
+      return randomAppearance(seed, {
+        top: { style: 'jaqueta', color: '#5a1a22', accent: '#121116' },
+        bottom: { style: 'calca', color: '#121116' },
+        accessories: ['caveira', 'luvas'],
+        held: 'taco',
+      });
+    return null; // sombra e fera continuam com desenho próprio
+  }
+  const held =
+    token.kind === 'npc'
+      ? 'nenhum'
+      : gear === 'ranged'
+        ? 'pistola'
+        : gear === 'melee'
+          ? 'taco'
+          : role === 'ocultista'
+            ? 'livro'
+            : role === 'especialista'
+              ? 'lanterna'
+              : role === 'combatente'
+                ? 'faca'
+                : 'nenhum';
+  const base = randomAppearance(seed, { held });
+  return { ...base, top: { ...base.top, color: token.kind === 'npc' ? base.top.color : token.color } };
+}
+
 export function TokenFigure({
   token,
   portrait,
+  portraitCutout,
+  appearance,
   role,
   gear,
   down,
@@ -298,6 +356,10 @@ export function TokenFigure({
   hpPct,
 }: {
   token: TokenDto;
+  /** A imagem enviada tem fundo transparente: vira figura recortada em pé (sem cartão). */
+  portraitCutout?: boolean;
+  /** Aparência escolhida na ficha (cabelo, corpo, roupas). */
+  appearance?: Appearance | null;
   /** Endereço da imagem enviada: vira um "cartão" em pé sobre a base. */
   portrait?: string;
   role?: FigureRole;
@@ -314,49 +376,82 @@ export function TokenFigure({
   const style = h % 6;
   const pants = pick(PANTS, h, 9);
   const rim = token.kind === 'enemy' ? '#b4232f' : token.kind === 'npc' ? '#c9a24b' : '#7c4ff0';
-  const figure = portrait ? (
-    // retrato enviado: cartão em pé, com moldura
-    <g>
-      <rect x="22" y="4" width="56" height="72" rx="6" fill="#120f18" stroke={rim} strokeWidth="2.5" />
-      <clipPath id={`fig-clip-${token.id}`}>
-        <rect x="25" y="7" width="50" height="66" rx="4" />
-      </clipPath>
-      <image
-        href={portrait}
-        x="25"
-        y="7"
-        width="50"
-        height="66"
-        preserveAspectRatio="xMidYMid slice"
-        clipPath={`url(#fig-clip-${token.id})`}
-        data-testid="token-image"
-      />
-      <rect x="25" y="7" width="50" height="66" rx="4" fill="url(#fg-card)" />
-      <rect x="44" y="76" width="12" height="8" fill="#2a2430" />
-    </g>
-  ) : token.kind === 'enemy' ? (
-    <Enemy look={enemyLook(token.label, h)} color={token.color} />
-  ) : (
-    <g>
-      <Body
-        shirt={token.color}
-        pants={pants}
-        skin={skin}
-        coat={token.kind === 'npc' ? pick(['#5a4636', '#3a4a5a', '#4a3a4a', '#6a5a3a'], h, 7) : undefined}
-      />
-      <Gear role={token.kind === 'npc' ? null : (role ?? null)} gear={gear ?? null} color={token.color} />
-      <Head skin={skin} hair={hair} style={style} hurt={down} />
-      {token.kind === 'npc' && h % 3 === 0 && (
-        <g fill="none" stroke="#1b1612" strokeWidth="1.2">
-          <circle cx="43.5" cy="25.5" r="4" />
-          <circle cx="56.5" cy="25.5" r="4" />
-          <path d="M47.5 25.5 L52.5 25.5" />
-        </g>
-      )}
-    </g>
-  );
+  const av = !portrait ? figureAppearance(token, role ?? null, gear ?? null, appearance) : null;
+  const figure =
+    portrait && portraitCutout ? (
+      // arte recortada (fundo transparente): a própria figura em pé, respirando
+      <g
+        className={down ? undefined : 'animate-breathe'}
+        style={{
+          transformOrigin: '50px 90px',
+          transformBox: 'view-box',
+          ...(down ? { filter: 'grayscale(1) brightness(0.7)' } : {}),
+        }}
+        transform={down ? 'rotate(-80 50 84) translate(-6 6)' : undefined}
+      >
+        <image
+          href={portrait}
+          x="-5"
+          y="-38"
+          width="110"
+          height="128"
+          preserveAspectRatio="xMidYMax meet"
+          data-testid="token-image"
+          data-cutout="true"
+        />
+      </g>
+    ) : portrait ? (
+      // retrato enviado: cartão em pé, com moldura
+      <g>
+        <rect x="22" y="4" width="56" height="72" rx="6" fill="#120f18" stroke={rim} strokeWidth="2.5" />
+        <clipPath id={`fig-clip-${token.id}`}>
+          <rect x="25" y="7" width="50" height="66" rx="4" />
+        </clipPath>
+        <image
+          href={portrait}
+          x="25"
+          y="7"
+          width="50"
+          height="66"
+          preserveAspectRatio="xMidYMid slice"
+          clipPath={`url(#fig-clip-${token.id})`}
+          data-testid="token-image"
+        />
+        <rect x="25" y="7" width="50" height="66" rx="4" fill="url(#fg-card)" />
+        <rect x="44" y="76" width="12" height="8" fill="#2a2430" />
+      </g>
+    ) : av ? (
+      // boneco ilustrado visto de cima (pés na base)
+      <g transform="translate(50 93) scale(0.7) translate(-50 -151)">
+        <AvatarFigure a={av} down={down} />
+      </g>
+    ) : token.kind === 'enemy' ? (
+      <Enemy look={enemyLook(token.label, h)} color={token.color} />
+    ) : (
+      <g>
+        <Body
+          shirt={token.color}
+          pants={pants}
+          skin={skin}
+          coat={token.kind === 'npc' ? pick(['#5a4636', '#3a4a5a', '#4a3a4a', '#6a5a3a'], h, 7) : undefined}
+        />
+        <Gear role={token.kind === 'npc' ? null : (role ?? null)} gear={gear ?? null} color={token.color} />
+        <Head skin={skin} hair={hair} style={style} hurt={down} />
+        {token.kind === 'npc' && h % 3 === 0 && (
+          <g fill="none" stroke="#1b1612" strokeWidth="1.2">
+            <circle cx="43.5" cy="25.5" r="4" />
+            <circle cx="56.5" cy="25.5" r="4" />
+            <path d="M47.5 25.5 L52.5 25.5" />
+          </g>
+        )}
+      </g>
+    );
   return (
-    <g data-figure={portrait ? 'card' : token.kind === 'enemy' ? enemyLook(token.label, h) : 'person'}>
+    <g
+      data-figure={
+        portrait ? (portraitCutout ? 'cutout' : 'card') : av ? 'avatar' : enemyLook(token.label, h)
+      }
+    >
       {/* base no chão */}
       <ellipse cx="50" cy="88" rx="36" ry="11" fill="rgba(0,0,0,0.5)" transform="translate(4 4)" />
       <ellipse
@@ -383,20 +478,24 @@ export function TokenFigure({
         />
       )}
       {/* boneco: respira de leve; caído = deitado e sem cor */}
-      <g
-        transform={down ? 'rotate(-80 50 84) translate(-6 6)' : undefined}
-        style={down ? { filter: 'grayscale(1) brightness(0.7)' } : undefined}
-      >
-        {/* em pé, mais alto que a casa (como uma miniatura), com os pés na base */}
-        <g transform="translate(50 86) scale(1.35) translate(-50 -86)">
-          <g
-            className={down ? undefined : 'animate-bob'}
-            style={{ transformOrigin: '50% 100%', transformBox: 'fill-box' }}
-          >
-            {figure}
+      {av || portraitCutout ? (
+        figure
+      ) : (
+        <g
+          transform={down ? 'rotate(-80 50 84) translate(-6 6)' : undefined}
+          style={down ? { filter: 'grayscale(1) brightness(0.7)' } : undefined}
+        >
+          {/* em pé, mais alto que a casa (como uma miniatura), com os pés na base */}
+          <g transform="translate(50 86) scale(1.35) translate(-50 -86)">
+            <g
+              className={down ? undefined : 'animate-bob'}
+              style={{ transformOrigin: '50% 100%', transformBox: 'fill-box' }}
+            >
+              {figure}
+            </g>
           </g>
         </g>
-      </g>
+      )}
       {/* barra de vida na frente da base */}
       {hpPct !== null && hpPct !== undefined && (
         <g data-testid="hp-bar">

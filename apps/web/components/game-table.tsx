@@ -323,6 +323,7 @@ export function GameTable({
       if (cls === 'combatente' || cls === 'especialista' || cls === 'ocultista') d.role = cls;
       const w = ch?.sheet.system?.weapons?.[0];
       if (w?.kind) d.gear = w.kind;
+      if (ch?.sheet.appearance) d.appearance = ch.sheet.appearance;
       const c = shownCombat?.combatants.find((x) =>
         t.characterId
           ? x.characterId === t.characterId

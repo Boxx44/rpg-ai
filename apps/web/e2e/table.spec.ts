@@ -135,6 +135,8 @@ test('jogador vê o mapa ao vivo, sem o inimigo oculto, e move o próprio token'
   const plTokens = plPage.getByTestId('map-token');
   await expect(plTokens).toHaveCount(1);
   await expect(plTokens.first()).toHaveAttribute('data-label', 'Lyra');
+  // personagem aparece como boneco 2D desenhado (que respira), não como bolinha
+  await expect(plTokens.first().locator('[data-figure="avatar"] [data-avatar]')).toHaveCount(1);
   await expect(gmPage.getByTestId('map-token')).toHaveCount(2);
 
   const scale = await plPage
