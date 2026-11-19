@@ -422,7 +422,7 @@ export function TokenFigure({
       </g>
     ) : av ? (
       // boneco ilustrado visto de cima (pés na base)
-      <g transform="translate(50 93) scale(0.7) translate(-50 -151)">
+      <g transform="translate(50 92) scale(1.2) translate(-50 -151)">
         <AvatarFigure a={av} down={down} />
       </g>
     ) : token.kind === 'enemy' ? (

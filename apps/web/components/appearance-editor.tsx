@@ -6,6 +6,7 @@ import {
   APPEARANCE_LABELS as LBL,
   appearanceSchema,
   BODY_TYPES,
+  FRAMES,
   BOTTOM_STYLES,
   CLOTH_COLORS,
   HAIR_COLORS,
@@ -31,8 +32,15 @@ const SECTIONS: { key: Section; label: string }[] = [
   { key: 'extras', label: 'Acessórios e itens' },
 ];
 
-function Thumb({ a, crop = 'full' }: { a: Appearance; crop?: 'full' | 'head' | 'legs' }) {
-  const vb = crop === 'head' ? '18 0 64 70' : crop === 'legs' ? '18 96 64 64' : '0 0 100 160';
+function Thumb({ a, crop = 'full' }: { a: Appearance; crop?: 'full' | 'head' | 'legs' | 'torso' }) {
+  const vb =
+    crop === 'head'
+      ? '34 0 32 37'
+      : crop === 'legs'
+        ? '26 78 48 76'
+        : crop === 'torso'
+          ? '24 26 52 70'
+          : '20 -3 60 158';
   return (
     <svg viewBox={vb} className="size-full" aria-hidden>
       <AvatarFigure a={a} still />
@@ -124,7 +132,7 @@ function Options<T extends string>({
   labels: Record<T, string>;
   preview: (o: T) => Appearance;
   onPick: (o: T) => void;
-  crop?: 'full' | 'head' | 'legs';
+  crop?: 'full' | 'head' | 'legs' | 'torso';
 }) {
   return (
     <div className="space-y-1.5">
@@ -181,7 +189,7 @@ export function AppearanceEditor({
   const set = (patch: Partial<Appearance>) => onChange(appearanceSchema.parse({ ...a, ...patch }));
   const accToggle = (x: (typeof ACCESSORIES)[number]) => {
     const has = a.accessories.includes(x);
-    const next = has ? a.accessories.filter((y) => y !== x) : [...a.accessories, x].slice(-4);
+    const next = has ? a.accessories.filter((y) => y !== x) : [...a.accessories, x].slice(-6);
     set({ accessories: next });
   };
   return (
@@ -192,7 +200,7 @@ export function AppearanceEditor({
       <div className="space-y-3">
         <div className="relative overflow-hidden rounded-xl border border-line bg-[radial-gradient(circle_at_50%_30%,#3a3046,#16131d)]">
           <svg
-            viewBox="-10 -6 120 172"
+            viewBox="14 -4 72 160"
             className="mx-auto h-[380px] w-full"
             role="img"
             aria-label="Prévia do boneco"
@@ -249,6 +257,14 @@ export function AppearanceEditor({
         </div>
         {section === 'corpo' && (
           <>
+            <Options
+              label="Silhueta"
+              options={FRAMES}
+              value={a.frame}
+              labels={LBL.frame}
+              preview={(o) => ({ ...a, frame: o })}
+              onPick={(o) => set({ frame: o })}
+            />
             <Options
               label="Tipo de corpo"
               options={BODY_TYPES}
@@ -318,6 +334,7 @@ export function AppearanceEditor({
               value={a.top.style}
               labels={LBL.top}
               preview={(o) => ({ ...a, top: { ...a.top, style: o } })}
+              crop="torso"
               onPick={(o) => set({ top: { ...a.top, style: o } })}
             />
             <Swatches
@@ -388,7 +405,7 @@ export function AppearanceEditor({
           <>
             <div className="space-y-1.5">
               <p className="text-xs font-medium uppercase tracking-wider text-ink-faint">
-                Acessórios (até 4)
+                Acessórios (até 6)
               </p>
               <div className="grid grid-cols-3 gap-2 sm:grid-cols-4" role="group" aria-label="Acessórios">
                 {ACCESSORIES.map((x) => (
@@ -409,7 +426,19 @@ export function AppearanceEditor({
                       <Thumb
                         a={{ ...a, accessories: [x] }}
                         crop={
-                          ['caveira', 'oculos', 'venda', 'cicatriz', 'colar'].includes(x) ? 'head' : 'full'
+                          ['caveira', 'oculos', 'venda', 'cicatriz', 'brincos'].includes(x)
+                            ? 'head'
+                            : [
+                                  'colar',
+                                  'pingente',
+                                  'cachecol',
+                                  'tatuagem',
+                                  'luvas',
+                                  'cinto',
+                                  'correntes',
+                                ].includes(x)
+                              ? 'torso'
+                              : 'full'
                         }
                       />
                     </span>
