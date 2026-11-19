@@ -15,7 +15,18 @@ import type {
 } from '@rpg-ai/shared';
 import { canManageCampaign } from '@rpg-ai/shared';
 import { Alert, Badge, Button, cn, Select } from '@rpg-ai/ui';
-import { Eye, Map as MapIcon, Minus, Plus, Wifi, WifiOff } from 'lucide-react';
+import {
+  BookOpen,
+  Eye,
+  IdCard,
+  Map as MapIcon,
+  Minus,
+  Plus,
+  ScrollText,
+  Swords,
+  Wifi,
+  WifiOff,
+} from 'lucide-react';
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { api, json } from '@/lib/api';
@@ -80,6 +91,10 @@ export function GameTable({
   const followsScene = !manager && !!live?.activeMapId;
   const [map, setMap] = useState<MapDto | null>(null);
   const [zoom, setZoom] = useState(1);
+  /** No celular a mesa mostra uma coisa por vez: o mapa ou o painel (crônica, combate, ficha, regras). */
+  const [view, setView] = useState<'map' | 'panel'>('map');
+  const [unread, setUnread] = useState(0);
+  const viewingChat = useRef(false);
   const [error, setError] = useState<string>();
 
   /** Rolagem em destaque na bandeja de dados (só as que chegam agora, não o histórico). */
@@ -94,6 +109,7 @@ export function GameTable({
       const out = rollOutcome(m.roll);
       if (out) setTimeout(() => playSound(out === 'crit' ? 'crit' : 'fail'), 750);
     } else if (m.id > lastRolled.current) lastRolled.current = m.id;
+    if (!viewingChat.current) setUnread((n) => Math.min(99, n + 1));
     setMessages((prev) =>
       prev.some((x) => x.id === m.id) ? prev : [...prev, m].sort((a, b) => a.id - b.id).slice(-300),
     );
@@ -365,10 +381,21 @@ export function GameTable({
     } else if (c) playSound('click');
   }, [shownCombat, manager]);
 
+  // Mensagens não lidas: zera quando a crônica está à vista.
+  useEffect(() => {
+    const isDesktop = typeof window !== 'undefined' && window.matchMedia?.('(min-width: 1280px)').matches;
+    viewingChat.current = tab === 'chat' && (view === 'panel' || !!isDesktop);
+    if (viewingChat.current) setUnread(0);
+  }, [tab, view]);
+  const myTurn = !!shownCombat?.combatants.find((c) => c.id === shownCombat.currentId)?.mine && !manager;
+
   const shownCharacters = asPlayer ? characters.filter((c) => c.ownerId === myId) : characters;
   return (
-    <div className="grid gap-5 xl:grid-cols-[1fr_400px]">
-      <section className="min-w-0 space-y-3" aria-label="Mapa">
+    <div className="grid gap-5 max-xl:pb-20 xl:grid-cols-[1fr_400px]">
+      {/* Fora das seções: aparecem mesmo com o mapa escondido (celular). */}
+      <DiceTray message={diceMsg} onDone={closeDice} />
+      {banner && <CombatIntro combat={banner} images={combatImages} onDone={closeBanner} />}
+      <section className={cn('min-w-0 space-y-3', view === 'panel' && 'max-xl:hidden')} aria-label="Mapa">
         {realManager && (
           <div
             className={cn(
@@ -378,7 +405,7 @@ export function GameTable({
             data-testid="preview-bar"
           >
             <Eye className="size-4 text-sky-300" />
-            <span className="flex-1 text-ink-muted">
+            <span className={cn('flex-1 text-ink-muted', !asPlayer && 'max-sm:hidden')}>
               {asPlayer
                 ? 'Pré-visualização: você está vendo a mesa como um jogador (sem segredos, ocultos e mapas não compartilhados).'
                 : 'Confira o que os jogadores veem antes de revelar algo.'}
@@ -408,6 +435,7 @@ export function GameTable({
             if (id) setMapId(id);
           }}
         />
+        <span id="table-map" className="block scroll-mt-20" aria-hidden />
         {shownCombat && (
           <CombatBanner campaignId={campaignId} combat={shownCombat} manager={manager} onChange={setCombat} />
         )}
@@ -481,10 +509,8 @@ export function GameTable({
             }}
           />
         )}
-        {banner && <CombatIntro combat={banner} images={combatImages} onDone={closeBanner} />}
         {shownMap ? (
           <div className="relative">
-            <DiceTray message={diceMsg} onDone={closeDice} />
             <MapCanvas
               map={shownMap}
               zoom={zoom}
@@ -494,7 +520,8 @@ export function GameTable({
               decorations={decorations}
               selectedTokenId={focusToken}
               onSelectToken={(t) => setFocusToken(t.id)}
-              className="max-h-[70vh]"
+              onZoomChange={setZoom}
+              className="max-h-[70vh] max-xl:max-h-[calc(100dvh-14rem)]"
             />
           </div>
         ) : (
@@ -523,9 +550,16 @@ export function GameTable({
           </p>
         )}
       </section>
-      <div className="flex flex-col gap-2 xl:sticky xl:top-20 xl:h-[calc(100dvh-7rem)]">
+      <div
+        className={cn(
+          'flex flex-col gap-2 xl:sticky xl:top-20 xl:h-[calc(100dvh-7rem)]',
+          // celular/tablet: o painel ocupa a tela entre o cabeçalho e a barra de baixo
+          'max-xl:fixed max-xl:inset-x-0 max-xl:bottom-[calc(3.5rem+env(safe-area-inset-bottom))] max-xl:top-16 max-xl:z-30 max-xl:bg-bg max-xl:p-3',
+          view === 'map' && 'max-xl:hidden',
+        )}
+      >
         <div
-          className="flex gap-1 rounded-lg border border-line bg-surface/80 p-1"
+          className="flex gap-1 rounded-lg border border-line bg-surface/80 p-1 max-xl:hidden"
           role="tablist"
           aria-label="Painel lateral"
         >
@@ -613,6 +647,71 @@ export function GameTable({
           </section>
         )}
       </div>
+      {/* Celular/tablet: barra fixa embaixo para trocar entre mapa e painéis. */}
+      <nav
+        className="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-bg/95 pb-[env(safe-area-inset-bottom)] backdrop-blur xl:hidden"
+        aria-label="Mesa"
+        data-testid="table-bottom-nav"
+      >
+        <div className="mx-auto flex max-w-xl">
+          {(
+            [
+              ['map', 'Mapa', MapIcon],
+              ['chat', 'Crônica', ScrollText],
+              ['combat', 'Combate', Swords],
+              ['sheet', 'Ficha', IdCard],
+              ['rules', 'Regras', BookOpen],
+            ] as const
+          ).map(([k, label, Icon]) => {
+            const active = k === 'map' ? view === 'map' : view === 'panel' && tab === k;
+            return (
+              <button
+                key={k}
+                type="button"
+                aria-current={active ? 'page' : undefined}
+                data-view={k}
+                onClick={() => {
+                  if (k === 'map') {
+                    setView('map');
+                    requestAnimationFrame(() =>
+                      document
+                        .getElementById('table-map')
+                        ?.scrollIntoView({ block: 'start', behavior: 'auto' }),
+                    );
+                  } else {
+                    setTab(k);
+                    setView('panel');
+                  }
+                }}
+                className={cn(
+                  'relative flex min-h-14 flex-1 flex-col items-center justify-center gap-0.5 text-[11px] transition-colors',
+                  active ? 'text-gold-bright' : 'text-ink-muted',
+                  k === 'combat' && myTurn && !active && 'animate-pulse-soft text-gold-bright',
+                )}
+              >
+                <Icon className="size-5" aria-hidden />
+                {label}
+                {k === 'chat' && unread > 0 && (
+                  <span
+                    className="absolute right-[22%] top-1.5 min-w-4 rounded-full bg-arcane-600 px-1 text-[10px] leading-4 text-white"
+                    data-testid="unread-badge"
+                    aria-label={`${unread} mensagens novas`}
+                  >
+                    {unread}
+                  </span>
+                )}
+                {k === 'combat' && combat && (
+                  <span
+                    className="absolute right-[28%] top-2 size-2 rounded-full bg-blood-light"
+                    aria-label="Combate em andamento"
+                  />
+                )}
+                {active && <span className="absolute inset-x-4 top-0 h-0.5 rounded bg-gold" aria-hidden />}
+              </button>
+            );
+          })}
+        </div>
+      </nav>
     </div>
   );
 }

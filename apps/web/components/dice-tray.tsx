@@ -107,7 +107,7 @@ export function DiceTray({ message, onDone }: { message: ChatMessageDto | null; 
   );
   return (
     <div
-      className="pointer-events-none absolute inset-x-0 top-4 z-30 flex justify-center"
+      className="pointer-events-none fixed inset-x-0 top-20 z-40 flex justify-center px-3"
       data-testid="dice-tray"
       aria-hidden
     >

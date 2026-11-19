@@ -8,9 +8,8 @@ import { useAssetUrls } from '@/lib/assets';
 import { prefersLessMotion } from '@/lib/feedback';
 
 function initials(name: string) {
-  return name
-    .split(/\s+/)
-    .filter(Boolean)
+  // só palavras com letra: "Arthur (exemplo)" vira "AE", não "A("
+  return (name.match(/\p{L}[\p{L}\p{N}'-]*/gu) ?? [name])
     .slice(0, 2)
     .map((p) => p[0]!.toUpperCase())
     .join('');
