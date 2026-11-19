@@ -214,11 +214,12 @@ let toasts: Toast[] = [];
 const toastListeners = new Set<() => void>();
 const emitToasts = () => toastListeners.forEach((l) => l());
 
-export function toast(title: string, opts: { body?: string; tone?: ToastTone; ms?: number } = {}) {
+export function toast(title: string, opts: { body?: string; tone?: ToastTone; ms?: number } = {}): number {
   const t: Toast = { id: Date.now() + Math.random(), title, body: opts.body, tone: opts.tone ?? 'info' };
   toasts = [...toasts.slice(-3), t];
   emitToasts();
   setTimeout(() => dismissToast(t.id), opts.ms ?? 4500);
+  return t.id;
 }
 
 export function dismissToast(id: number) {

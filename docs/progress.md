@@ -22,6 +22,23 @@
 
 ---
 
+## 19/11/2026 — Mapas realistas e imagens fáceis
+
+**O que funciona (testado):**
+
+- **Chão realista:** madeira com veios e tábuas desencontradas, pedra, tijolo, grama com folhas, terra com pedrinhas, areia, rocha, neve, tapete estampado, azulejo, asfalto, água com reflexos e lava com rachaduras brilhantes. As texturas são geradas pelo próprio site, sem imagens de terceiros.
+- **Paredes com volume:** projetam sombra no chão.
+- **Árvores:** copas cheias com sombra.
+- **Objetos refeitos:** luz e sombra; madeira, metal, vidro e tecido com aparência própria; sombra projetada. Isso vale para portas, móveis, baú, armas, carro, fogueira, círculo ritual com velas e outros.
+- **Imagens fáceis:**
+  - botão **"Imagem de fundo"** na barra do editor de mapas;
+  - **arrastar uma imagem do computador** para o mapa: no vazio vira o fundo; sobre um token vira a imagem dele, e um aviso mostra onde ela vai cair;
+  - **Ctrl+V** cola uma imagem copiada (de um site, por exemplo) como fundo; com um token selecionado, cola nele;
+  - na mesa, o mestre faz o mesmo; o jogador solta a imagem sobre o token do próprio personagem para virar o retrato;
+  - **retrato que salva na hora:** botão de câmera no cartão do personagem (clique ou solte a imagem); na ficha, trocar o retrato não depende mais de "Salvar ficha". O mesmo vale para o retrato do NPC.
+
+**Testes:** ponta a ponta 51 (novo: imagens fáceis), API 85, banco 52, shared 15, regras 57, lint e typecheck sem erros.
+
 ## 19/11/2026 — Mesa no celular
 
 **O que funciona (testado num celular simulado, Pixel 7):**

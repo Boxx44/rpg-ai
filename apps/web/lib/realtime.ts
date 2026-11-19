@@ -80,7 +80,9 @@ export function useUserRealtime(handlers: Handlers) {
         );
       },
     });
-    socket.onAny((event: string, payload: unknown) => (ref.current[event] as ((p: unknown) => void) | undefined)?.(payload));
+    socket.onAny((event: string, payload: unknown) =>
+      (ref.current[event] as ((p: unknown) => void) | undefined)?.(payload),
+    );
     return () => {
       socket.close();
     };

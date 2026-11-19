@@ -124,3 +124,36 @@ export function useAssetUrls(campaignId: string, ids: (string | null | undefined
 export function useAssetUrl(campaignId: string, id: string | null | undefined): string | undefined {
   return useAssetUrls(campaignId, [id])[id ?? ''];
 }
+
+/** Primeira imagem de um arrastar-e-soltar ou de um Ctrl+V (ou null). */
+export function imageFrom(data: DataTransfer | null): File | null {
+  if (!data) return null;
+  for (const f of Array.from(data.files ?? [])) if (f.type.startsWith('image/')) return f;
+  for (const it of Array.from(data.items ?? [])) {
+    if (it.kind === 'file' && it.type.startsWith('image/')) {
+      const f = it.getAsFile();
+      if (f) return f;
+    }
+  }
+  return null;
+}
+
+/** O arrasto traz arquivos (para mostrar "solte aqui")? */
+export function draggingFiles(e: { dataTransfer: DataTransfer | null }): boolean {
+  return !!e.dataTransfer && Array.from(e.dataTransfer.types ?? []).includes('Files');
+}
+
+/** Ctrl+V com imagem na página (ignora quando está digitando num campo de texto sem imagem). */
+export function usePasteImage(enabled: boolean, onImage: (f: File) => void) {
+  useEffect(() => {
+    if (!enabled) return;
+    const h = (e: ClipboardEvent) => {
+      const f = imageFrom(e.clipboardData);
+      if (!f) return;
+      e.preventDefault();
+      onImage(f);
+    };
+    window.addEventListener('paste', h);
+    return () => window.removeEventListener('paste', h);
+  }, [enabled, onImage]);
+}

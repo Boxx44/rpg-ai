@@ -36,7 +36,8 @@ import { ChatPanel } from './chat-panel';
 import { CombatIntro, InitiativeBar, useCombatImages } from './combat-stage';
 import { DiceTray, rollOutcome } from './dice-tray';
 import { MapCanvas, type TokenDecoration } from './map-canvas';
-import { playSound, toast } from '@/lib/feedback';
+import { dismissToast, playSound, toast } from '@/lib/feedback';
+import { uploadAsset, usePasteImage } from '@/lib/assets';
 import { CombatBanner, CombatPanel } from './combat-panel';
 import { SessionBar } from './session-bar';
 import { QuickSheetPanel, RulesPanel } from './table-panels';
@@ -389,6 +390,67 @@ export function GameTable({
   }, [tab, view]);
   const myTurn = !!shownCombat?.combatants.find((c) => c.id === shownCombat.currentId)?.mine && !manager;
 
+  /** De quem é o personagem deste token (para o jogador pôr o próprio retrato). */
+  const ownCharacter = (t: TokenDto | null) =>
+    t?.characterId ? characters.find((c) => c.id === t.characterId && c.ownerId === myId) : undefined;
+
+  /**
+   * Imagem solta no mapa ou colada (Ctrl+V).
+   * Mestre: sobre uma peça = imagem dela; no vazio = fundo do mapa.
+   * Jogador: sobre o token do próprio personagem = retrato.
+   */
+  async function placeImage(file: File, target: TokenDto | null) {
+    if (!shownMap || myRole === 'spectator') return;
+    const mine = ownCharacter(target);
+    if (!manager && !mine) {
+      toast('Solte a imagem sobre o token do seu personagem', {
+        body: 'Assim ela vira o retrato dele. O fundo do mapa é com o mestre.',
+        tone: 'info',
+      });
+      return;
+    }
+    setError(undefined);
+    const sending = toast('Enviando imagem…', { ms: 15000 });
+    try {
+      const tk = () => accessToken();
+      if (mine && !manager) {
+        const a = await uploadAsset(campaignId, 'portrait', file);
+        const updated = await api<CharacterDto>(
+          `/campaigns/${campaignId}/characters/${mine.id}`,
+          await tk(),
+          {
+            method: 'PATCH',
+            body: json({ portraitAsset: a.id, version: mine.version }),
+          },
+        );
+        setCharacters((list) => list.map((c) => (c.id === updated.id ? updated : c)));
+      } else if (target) {
+        const a = await uploadAsset(campaignId, 'token', file);
+        await api(`/campaigns/${campaignId}/maps/${shownMap.id}/tokens/${target.id}`, await tk(), {
+          method: 'PATCH',
+          body: json({ imageAsset: a.id }),
+        });
+      } else {
+        const a = await uploadAsset(campaignId, 'map', file);
+        await api(`/campaigns/${campaignId}/maps/${shownMap.id}`, await tk(), {
+          method: 'PATCH',
+          body: json({ backgroundAsset: a.id }),
+        });
+      }
+      void loadMap(shownMap.id);
+      dismissToast(sending);
+      playSound('notify');
+      toast(target ? `Imagem posta em ${target.label}` : 'Fundo do mapa trocado', { tone: 'success' });
+    } catch (e) {
+      dismissToast(sending);
+      setError(e instanceof Error ? e.message : 'Falha ao enviar a imagem');
+    }
+  }
+  usePasteImage(manager && !!shownMap, (f) => {
+    const t = shownMap?.tokens.find((x) => x.id === focusToken && !x.icon) ?? null;
+    void placeImage(f, t);
+  });
+
   const shownCharacters = asPlayer ? characters.filter((c) => c.ownerId === myId) : characters;
   return (
     <div className="grid gap-5 max-xl:pb-20 xl:grid-cols-[1fr_400px]">
@@ -521,6 +583,16 @@ export function GameTable({
               selectedTokenId={focusToken}
               onSelectToken={(t) => setFocusToken(t.id)}
               onZoomChange={setZoom}
+              onDropImage={myRole === 'spectator' ? undefined : (f, t) => void placeImage(f, t)}
+              dropHint={(t) =>
+                manager
+                  ? t
+                    ? `Soltar para pôr a imagem em ${t.label}`
+                    : 'Soltar para usar como fundo do mapa'
+                  : ownCharacter(t)
+                    ? `Soltar para usar como retrato de ${t?.label}`
+                    : 'Solte sobre o token do seu personagem'
+              }
               className="max-h-[70vh] max-xl:max-h-[calc(100dvh-14rem)]"
             />
           </div>

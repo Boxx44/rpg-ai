@@ -125,7 +125,19 @@ export function NpcEditor({
             kind="portrait"
             label="Retrato (jogadores só veem quando o NPC for revelado)"
             value={portrait}
-            onChange={(id) => setPortrait(id)}
+            onChange={async (id) => {
+              // salva na hora, sem precisar apertar "Salvar NPC"
+              setPortrait(id);
+              if (!initial || !campaignId) return;
+              try {
+                await api(`/campaigns/${campaignId}/npcs/${initial.id}`, await accessToken(), {
+                  method: 'PATCH',
+                  body: json({ portraitAsset: id }),
+                });
+              } catch (e) {
+                setError(e instanceof Error ? e.message : 'Não foi possível salvar o retrato');
+              }
+            }}
           />
         )}
         <div className="grid gap-4 sm:grid-cols-[1fr_auto]">

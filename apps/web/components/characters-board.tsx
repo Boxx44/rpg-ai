@@ -3,11 +3,12 @@
 import type { SystemDefinition, SystemValues } from '@rpg-ai/rules-engine';
 import type { CharacterDto, CharacterSheet, ChatMessageDto } from '@rpg-ai/shared';
 import { Alert, Button, Card, CardContent, cn, Field, Input, Textarea } from '@rpg-ai/ui';
-import { Minus, Plus, Trash2 } from 'lucide-react';
+import { Camera, Loader2, Minus, Plus, Trash2 } from 'lucide-react';
 import { ImagePicker } from './image-picker';
-import { useAssetUrl } from '@/lib/assets';
+import { draggingFiles, imageFrom, uploadAsset, useAssetUrl } from '@/lib/assets';
+import { toast } from '@/lib/feedback';
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { api, json } from '@/lib/api';
 import { accessToken } from '@/lib/supabase';
 import { normalizeValues, type RollTarget, safeCompute, SystemSheet } from './system-sheet';
@@ -111,6 +112,26 @@ export function SheetEditor({
   const [concept, setConcept] = useState(initial?.concept ?? seed?.concept ?? '');
   const [color, setColor] = useState(initial?.color ?? seed?.color ?? '#7c4ff0');
   const [portrait, setPortrait] = useState<string | null>(initial?.portraitAsset ?? null);
+  const [version, setVersion] = useState(initial?.version ?? 0);
+  /** O retrato é salvo na hora (não precisa apertar "Salvar ficha"). */
+  async function savePortrait(id: string | null) {
+    setPortrait(id);
+    if (!initial || !campaignId || persist) return;
+    try {
+      const updated = await api<CharacterDto>(
+        `/campaigns/${campaignId}/characters/${initial.id}`,
+        await accessToken(),
+        {
+          method: 'PATCH',
+          body: json({ portraitAsset: id, version }),
+        },
+      );
+      setVersion(updated.version);
+      toast(id ? 'Retrato salvo' : 'Retrato removido', { tone: 'success', ms: 1800 });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Não foi possível salvar o retrato');
+    }
+  }
   const [sheet, setSheet] = useState<CharacterSheet>(initial?.sheet ?? seed?.sheet ?? EMPTY_SHEET);
   const [error, setError] = useState<string>();
   const [saving, setSaving] = useState(false);
@@ -183,7 +204,7 @@ export function SheetEditor({
             color,
             sheet: clean,
             portraitAsset: portrait,
-            version: initial.version,
+            version,
           }),
         });
       else
@@ -223,7 +244,7 @@ export function SheetEditor({
             kind="portrait"
             label="Retrato (aparece no token e no combate)"
             value={portrait}
-            onChange={(id) => setPortrait(id)}
+            onChange={savePortrait}
             className={readOnly ? 'pointer-events-none opacity-70' : undefined}
           />
         )}
@@ -609,6 +630,76 @@ export function Avatar({
   );
 }
 
+/**
+ * Botão de câmera sobre o retrato do cartão: escolher (ou soltar) uma imagem
+ * troca o retrato na hora, sem abrir a ficha.
+ */
+function QuickPortrait({ campaignId, character }: { campaignId: string; character: CharacterDto }) {
+  const router = useRouter();
+  const input = useRef<HTMLInputElement>(null);
+  const [busy, setBusy] = useState(false);
+  const [over, setOver] = useState(false);
+  async function send(file: File | null | undefined) {
+    if (!file) return;
+    setBusy(true);
+    try {
+      const a = await uploadAsset(campaignId, 'portrait', file);
+      await api(`/campaigns/${campaignId}/characters/${character.id}`, await accessToken(), {
+        method: 'PATCH',
+        body: json({ portraitAsset: a.id, version: character.version }),
+      });
+      toast('Retrato salvo', { tone: 'success', ms: 1800 });
+      router.refresh();
+    } catch (e) {
+      toast('Não foi possível trocar o retrato', {
+        tone: 'danger',
+        body: e instanceof Error ? e.message : undefined,
+      });
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <>
+      <input
+        ref={input}
+        type="file"
+        accept="image/png,image/jpeg,image/webp"
+        className="sr-only"
+        aria-label={`Trocar retrato de ${character.name}`}
+        onChange={(e) => {
+          void send(e.target.files?.[0]);
+          e.target.value = '';
+        }}
+      />
+      <button
+        type="button"
+        onClick={() => input.current?.click()}
+        onDragOver={(e) => {
+          if (!draggingFiles(e)) return;
+          e.preventDefault();
+          setOver(true);
+        }}
+        onDragLeave={() => setOver(false)}
+        onDrop={(e) => {
+          e.preventDefault();
+          setOver(false);
+          void send(imageFrom(e.dataTransfer));
+        }}
+        title="Trocar retrato (clique ou solte uma imagem aqui)"
+        aria-label={`Escolher retrato de ${character.name}`}
+        data-testid="quick-portrait"
+        className={cn(
+          'absolute left-[3.25rem] top-[3.1rem] z-10 grid size-6 place-items-center rounded-full border bg-bg text-ink-muted shadow transition-colors hover:text-gold-bright',
+          over ? 'scale-125 border-gold text-gold-bright' : 'border-line',
+        )}
+      >
+        {busy ? <Loader2 className="size-3.5 animate-spin" /> : <Camera className="size-3.5" />}
+      </button>
+    </>
+  );
+}
+
 export function CharactersBoard({
   campaignId,
   characters,
@@ -650,7 +741,8 @@ export function CharactersBoard({
       ) : (
         <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {characters.map((c) => (
-            <li key={c.id}>
+            <li key={c.id} className="relative">
+              {c.canEdit && <QuickPortrait campaignId={campaignId} character={c} />}
               <button
                 type="button"
                 onClick={() => setEditing(c)}

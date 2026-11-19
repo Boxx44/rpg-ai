@@ -261,3 +261,16 @@ _Regras completadas_
 - **Por quê:** empilhar o mapa e o painel obrigava a rolar a página sem parar, e o campo de mensagem ficava escondido.
 - **Gestos do mapa:** implementados com Pointer Events (`touch-action: none` no mapa). Um dedo arrasta a vista e dois dedos dão zoom; o toque sem movimento vira clique.
 - O computador não muda: as abas laterais continuam como eram.
+
+**ADR-040 — Texturas procedurais no navegador.**
+
+- O chão e os materiais usam texturas geradas por ruído (`apps/web/lib/textures.ts`) num canvas, uma vez por aba, e usadas como `<pattern>` no SVG.
+- **Por quê:** fica com aparência realista sem baixar imagens de terceiros (sem risco de direitos autorais) e sem pesar o site.
+- **Plano B:** os objetos usam pinturas com cor reserva (`url(#x) cor`), então aparecem também fora do mapa, como na paleta.
+
+**ADR-041 — Imagem por arrastar e colar.**
+
+- O mapa aceita arquivos soltos e `paste` com imagem.
+- A peça sob o mouse decide o destino: a imagem dela, o retrato (no caso do jogador e do próprio personagem) ou o fundo do mapa.
+- A permissão continua sendo checada no servidor (RLS e regras de imagens da ADR-036).
+- O retrato salva na hora, com controle de versão, para não dar conflito ao salvar a ficha depois.

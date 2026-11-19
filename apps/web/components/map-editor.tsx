@@ -27,19 +27,21 @@ import {
   EyeOff,
   MousePointer2,
   Plus,
+  Image as ImageIcon,
   Power,
   RotateCw,
   Trash2,
   UserPlus,
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { api, json } from '@/lib/api';
 import { accessToken } from '@/lib/supabase';
 import { MapCanvas, TERRAIN_STYLE } from './map-canvas';
-import { PropArt } from './map-props';
+import { PropArt, PropDefs } from './map-props';
 import { ImagePicker } from './image-picker';
-import { useAssetUrl } from '@/lib/assets';
+import { uploadAsset, useAssetUrl, usePasteImage } from '@/lib/assets';
+import { dismissToast, playSound, toast } from '@/lib/feedback';
 
 type Tool =
   | { kind: 'select' }
@@ -266,12 +268,41 @@ export function MapEditor({
     await patchMap({ rows });
   }
 
+  /**
+   * Imagem vinda do computador (botão, arrastar ou Ctrl+V): sobre uma peça vira a
+   * imagem dela; senão vira o fundo do mapa.
+   */
+  async function placeImage(file: File, target: TokenDto | null) {
+    if (!map) return;
+    setError(undefined);
+    const sending = toast(target ? `Enviando imagem de ${target.label}…` : 'Enviando fundo do mapa…', {
+      ms: 15000,
+    });
+    try {
+      const a = await uploadAsset(campaignId, target ? 'token' : 'map', file);
+      if (target) await setTokenImage(target, a.id);
+      else await patchMap({ backgroundAsset: a.id });
+      dismissToast(sending);
+      playSound('notify');
+      toast(target ? `Imagem posta em ${target.label}` : 'Fundo do mapa trocado', {
+        tone: 'success',
+        body: target ? undefined : 'Dica: "Ajustar grade à imagem" no painel ao lado.',
+      });
+    } catch (e) {
+      dismissToast(sending);
+      setError(e instanceof Error ? e.message : 'Falha ao enviar a imagem');
+    }
+  }
+  const bgInput = useRef<HTMLInputElement>(null);
+  usePasteImage(!!map, (f) => void placeImage(f, selected && !selected.icon ? selected : null));
+
   async function setTokenImage(t: TokenDto, imageAsset: string | null) {
     await call((tk) => api(`${base}/tokens/${t.id}`, tk, { method: 'PATCH', body: json({ imageAsset }) }));
     const m = await call((tk) => api<MapDto>(base, tk));
     if (m) {
       setMap(m);
-      setSelected(m.tokens.find((x) => x.id === t.id) ?? null);
+      // só atualiza a seleção se esta peça já estava selecionada (arrastar imagem não seleciona)
+      setSelected((cur) => (cur?.id === t.id ? (m.tokens.find((x) => x.id === t.id) ?? null) : cur));
     }
   }
 
@@ -494,6 +525,27 @@ export function MapEditor({
               >
                 <Armchair className="size-3.5" /> Objetos
               </button>
+              <input
+                ref={bgInput}
+                type="file"
+                accept="image/png,image/jpeg,image/webp"
+                className="sr-only"
+                aria-label="Escolher imagem de fundo"
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  e.target.value = '';
+                  if (f) void placeImage(f, null);
+                }}
+              />
+              <button
+                type="button"
+                className={toolBtn(false)}
+                onClick={() => bgInput.current?.click()}
+                data-testid="tool-background"
+                title="Também dá para arrastar uma imagem para o mapa ou colar com Ctrl+V"
+              >
+                <ImageIcon className="size-3.5" /> Imagem de fundo
+              </button>
               <span className="ml-auto flex items-center gap-1 text-xs text-ink-muted">
                 <Button
                   size="sm"
@@ -518,6 +570,7 @@ export function MapEditor({
               map={map}
               zoom={zoom}
               onZoomChange={setZoom}
+              onDropImage={(f, target) => void placeImage(f, target)}
               className="max-h-[70vh]"
               canMove={() => tool.kind === 'select'}
               onMove={onMove}
@@ -533,7 +586,10 @@ export function MapEditor({
                   ? 'Clique numa casa para colocar o token.'
                   : tool.kind === 'prop'
                     ? `Clique numa casa para colocar: ${PROPS[tool.prop].label}.`
-                    : 'Arraste tokens para movê-los. Clique para selecionar.'}
+                    : 'Arraste tokens para movê-los. Clique para selecionar.'}{' '}
+              <span className="text-ink-muted">
+                Imagens: arraste do computador para o mapa (fundo) ou para um token, ou cole com Ctrl+V.
+              </span>
             </p>
             {error && <Alert tone="error">{error}</Alert>}
           </div>
@@ -727,7 +783,10 @@ export function MapEditor({
                                 : 'border-line text-ink-muted hover:border-arcane-500/60 hover:text-ink',
                             )}
                           >
-                            <svg viewBox="0 0 100 100" className="size-9 rounded bg-[#2a2433]" aria-hidden>
+                            <svg viewBox="0 0 100 100" className="size-10 rounded bg-[#2a2433]" aria-hidden>
+                              <defs>
+                                <PropDefs />
+                              </defs>
                               <PropArt kind={k} state={(PROPS[k].states[0] as TokenDto['state']) ?? null} />
                             </svg>
                             <span className="w-full truncate">{PROPS[k].label}</span>
