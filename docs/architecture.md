@@ -291,6 +291,14 @@ Existem hoje: `apps/web`, `apps/api`, `packages/{db,shared,ui,logger,rules-engin
 
 **Fluxo de autenticação implementado:** o navegador faz login no Supabase Auth → recebe um token (JWT) → envia o token à API → a API verifica a assinatura (segredo HS256 ou chaves públicas JWKS) → confirma que a conta existe e está ativa → executa a consulta no banco com o papel do usuário (RLS ativo).
 
+### Personagens em pixel art (LPC)
+
+- `tools/lpc/catalog.py` + `build.py`: escolhem e copiam as peças. Saída em `apps/web/public/lpc/` e `packages/shared/src/lpc-catalog.json`.
+- `packages/shared/src/lpc.ts`: catálogo, validação (`pixelSchema`), camadas (`lpcLayers`) e sorteio (`randomPixel`).
+- `apps/web/lib/lpc.ts`: monta o quadro 64×64 no navegador, com troca de cor por paleta e cache.
+- `components/appearance-editor.tsx`: o editor da aba Aparência. `token-figure.tsx`: `PixelFigure` no mapa.
+- `app/creditos/page.tsx`: página pública com os créditos.
+
 ### Bonecos do mapa (web)
 
 - `components/avatar-figure.tsx`: desenha o boneco 2D a partir de `Appearance` (shared).

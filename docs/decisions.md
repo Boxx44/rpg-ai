@@ -315,3 +315,17 @@ _Regras completadas_
   - 6 corpos, 14 cabelos, 11 roupas de cima, 6 de baixo e 6 calçados;
   - até 6 acessórios e celular na mão.
 - O estilo é original. As referências enviadas serviram só de direção; não houve cópia de arte de terceiros.
+
+**ADR-047 — Criador de personagem em pixel art (LPC).**
+
+- O responsável pediu um criador "como nos jogos" (corpo, cabelo e roupas trocáveis, com cores) e escolheu pixel art de RPG.
+- Usamos peças da biblioteca aberta **LPC (Liberated Pixel Cup)**. A seleção fica em `tools/lpc/catalog.py` e é gerada por `tools/lpc/build.py`:
+  - 4 corpos e 6 rostos;
+  - 34 cabelos, 4 barbas e 22 roupas de cima;
+  - 6 casacos, 3 cintos, 11 roupas de baixo e 8 calçados;
+  - acessórios e 7 armas.
+- Só a folha "walk" (4 direções × 9 quadros de 64 px) de cada peça vai para `apps/web/public/lpc` (≈5 MB). O catálogo vai para `packages/shared/src/lpc-catalog.json`.
+- A cor é trocada por paleta: as cores-base da peça viram as cores escolhidas. A montagem e a troca de cor são feitas no navegador (`lib/lpc.ts`), com cache.
+- A aparência guarda só ids e nomes de cor (`sheet.appearance.pixel`). O Zod confere cada peça e cada cor contra o catálogo, também no servidor; nada de caminho livre.
+- **Licença:** as peças são CC-BY-SA/CC-BY/OGA-BY/GPL/CC0. Uso comercial é permitido com créditos, e os personagens montados ficam CC-BY-SA. A página pública `/creditos` lista artistas, licenças e links (exigência das licenças).
+- O boneco vetorial antigo continua no código só como reserva (sombra e fera usam desenho próprio).

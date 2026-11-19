@@ -22,6 +22,21 @@
 
 ---
 
+## 19/11/2026 — Criador de personagem em pixel art
+
+**O que funciona (testado):**
+
+- **Aba Aparência no estilo de jogo de RPG em pixel art**, com peças da biblioteca aberta LPC:
+  - 4 tipos de corpo, várias peles e 6 rostos, com cor dos olhos;
+  - 34 cabelos em 26 cores e barbas;
+  - camisetas, camisas, regatas, blusas, casacos, sobretudo, cintos, calças, saias, shorts e botas;
+  - capuz, óculos, tapa-olho, colar e armas.
+- Cada peça tem dezenas de cores. Há botão "Aleatório", e a prévia gira o personagem nas 4 direções.
+- **No mapa**, o token mostra o personagem em pixel art, respirando. Personagens sem aparência escolhida ganham um visual sorteado. Zumbi, cultista e capanga também viraram pixel art.
+- **Créditos** dos artistas em `/creditos`, como pedem as licenças.
+
+**Testes:** unidade (db 58, api 92, shared 22, regras 57) e ponta a ponta (54) passando; lint e tipos sem erros.
+
 ## 19/11/2026 — Bonecos em estilo anime
 
 **O que funciona (testado):**
