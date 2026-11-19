@@ -22,6 +22,24 @@
 
 ---
 
+## 19/11/2026 — Bonecos em estilo anime
+
+**O que funciona (testado):**
+
+- **Bonecos redesenhados em estilo anime:**
+  - corpo inteiro, sombras chapadas, olhos grandes e contorno escuro;
+  - no mapa, a figura ocupa cerca de dois quadrados de altura e continua respirando e piscando.
+- **Aba Aparência ampliada:**
+  - silhueta feminina/masculina;
+  - corpos magro, médio, atlético, musculoso, robusto e gordo;
+  - novos cabelos (chanel, longo ondulado);
+  - novas roupas (cropped, camisa social, quimono aberto, saia longa);
+  - coturno alto e salto plataforma;
+  - colar com pingente, brincos, tatuagens e cinto;
+  - celular na mão.
+
+**Testes:** unidade (db 58, api 92, shared 18, regras 57) e ponta a ponta (54) passando; lint e tipos sem erros.
+
 ## 19/11/2026 — Bonecos 2D que respiram e aba Aparência
 
 **O que funciona (testado):**

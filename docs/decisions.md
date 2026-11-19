@@ -305,3 +305,13 @@ _Regras completadas_
 - Ao enviar imagem de token ou retrato, o navegador apaga o fundo se os quatro cantos tiverem a mesma cor (preenchimento a partir das bordas, com borda suave). Fotos com fundo variado ficam intactas.
 - Imagem com transparência vira figura recortada que respira no mapa (`data-figure="cutout"`); sem transparência, continua como "carta" com moldura.
 - Feito no cliente para não gastar servidor; o servidor continua validando tipo e tamanho. Há uma caixa para desligar o recorte.
+
+**ADR-046 — Boneco em estilo anime (cel shading).**
+
+- O boneco foi redesenhado com proporções de corpo inteiro e cabeça um pouco maior, a pedido do responsável ("mais anime").
+- A sombra é chapada, de borda dura: a própria forma, deslocada, recorta uma "lua" de sombra à direita e um fio de luz à esquerda (máscaras SVG). Olhos grandes com brilho, nariz e boca em traço.
+- Novas opções, todas compatíveis com fichas antigas (valores novos têm padrão):
+  - silhueta feminina/masculina;
+  - 6 corpos, 14 cabelos, 11 roupas de cima, 6 de baixo e 6 calçados;
+  - até 6 acessórios e celular na mão.
+- O estilo é original. As referências enviadas serviram só de direção; não houve cópia de arte de terceiros.
