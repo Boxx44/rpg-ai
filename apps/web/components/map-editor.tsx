@@ -380,6 +380,7 @@ export function MapEditor({
     router.refresh();
   }
 
+  const [showNew, setShowNew] = useState(false);
   const toolBtn = (active: boolean) =>
     cn(
       'inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs transition-colors',
@@ -388,7 +389,19 @@ export function MapEditor({
 
   return (
     <div className="space-y-5">
-      <Card>
+      {/* No celular, o formulário de novo mapa fica recolhido quando já existe mapa. */}
+      {maps.length > 0 && (
+        <Button
+          variant="outline"
+          className="w-full lg:hidden"
+          onClick={() => setShowNew((v) => !v)}
+          aria-expanded={showNew}
+          data-testid="toggle-new-map"
+        >
+          <Plus /> {showNew ? 'Fechar novo mapa' : 'Novo mapa'}
+        </Button>
+      )}
+      <Card className={cn(maps.length > 0 && !showNew && 'max-lg:hidden')}>
         <CardContent className="pt-6">
           <NewMapForm
             campaignId={campaignId}
@@ -406,6 +419,7 @@ export function MapEditor({
                 ...l,
               ]);
               setMap(m);
+              setShowNew(false);
               router.refresh();
             }}
           />
@@ -503,6 +517,7 @@ export function MapEditor({
             <MapCanvas
               map={map}
               zoom={zoom}
+              onZoomChange={setZoom}
               className="max-h-[70vh]"
               canMove={() => tool.kind === 'select'}
               onMove={onMove}

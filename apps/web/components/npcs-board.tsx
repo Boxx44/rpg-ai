@@ -291,7 +291,8 @@ export function NpcEditor({
         </div>
 
         {error && <Alert tone="error">{error}</Alert>}
-        <div className="flex flex-wrap justify-between gap-2">
+        {/* No celular, os botões ficam presos embaixo para não precisar rolar a ficha toda. */}
+        <div className="flex flex-wrap justify-between gap-2 max-lg:sticky max-lg:bottom-0 max-lg:z-20 max-lg:-mx-6 max-lg:border-t max-lg:border-line max-lg:bg-surface/95 max-lg:px-6 max-lg:py-3 max-lg:backdrop-blur">
           <div>
             {(initial || persist?.remove) && (
               <Button variant="danger" onClick={remove}>

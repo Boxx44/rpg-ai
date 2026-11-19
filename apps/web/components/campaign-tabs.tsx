@@ -4,6 +4,7 @@ import { cn } from '@rpg-ai/ui';
 import { Castle, History, Map as MapIcon, ScrollText, Settings, Users } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useEffect, useRef } from 'react';
 
 /**
  * Navegação da campanha em dois blocos:
@@ -57,9 +58,17 @@ export function CampaignTabs({
     </span>
   );
   const playActive = path === base;
+  const navRef = useRef<HTMLElement>(null);
+  // No celular o menu rola de lado: deixa a seção atual sempre à vista.
+  useEffect(() => {
+    navRef.current
+      ?.querySelector('[aria-current="page"]')
+      ?.scrollIntoView?.({ inline: 'center', block: 'nearest' });
+  }, [path]);
   return (
     <nav
-      className="-mx-1 flex items-stretch gap-1 overflow-x-auto border-b border-line pb-px"
+      ref={navRef}
+      className="-mx-1 flex items-stretch gap-1 overflow-x-auto border-b border-line pb-px [scrollbar-width:none] max-sm:[mask-image:linear-gradient(to_right,black_88%,transparent)]"
       aria-label="Seções da campanha"
     >
       {group('Jogar')}
