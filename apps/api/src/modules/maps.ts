@@ -10,7 +10,19 @@ import {
   Patch,
   Post,
 } from '@nestjs/common';
-import { and, asc, type Database, desc, eq, isNull, schema, sql, type Tx, withUser } from '@rpg-ai/db';
+import {
+  and,
+  asc,
+  type Database,
+  desc,
+  eq,
+  inArray,
+  isNull,
+  schema,
+  sql,
+  type Tx,
+  withUser,
+} from '@rpg-ai/db';
 import {
   type CreateMapInput,
   createMapSchema,
@@ -26,6 +38,9 @@ import {
   type PaintInput,
   paintSchema,
   type Terrain,
+  searchAreaSchema,
+  type SearchAreaInput,
+  type SearchResultDto,
   type TokenDto,
   type UpdateMapInput,
   updateMapSchema,
@@ -39,6 +54,7 @@ import { type AuthUser, DB } from '../common/tokens';
 import { requireManager, requireMember, requirePlayer } from './access';
 import { audit } from './audit';
 import { anyId, campaignId } from './ids';
+import { CharactersService } from './characters';
 import { Realtime } from './realtime.gateway';
 
 const m = schema.maps;
@@ -46,7 +62,13 @@ const t = schema.mapTokens;
 
 const outOfBounds = () => new AppError(ERROR_CODES.VALIDATION, 'Posição fora do mapa', 400);
 
-function toToken(r: typeof t.$inferSelect, portrait: string | null = null): TokenDto {
+function toToken(
+  r: typeof t.$inferSelect,
+  portrait: string | null = null,
+  view?: { manager: boolean; foundBy?: string[]; discovered?: boolean },
+): TokenDto {
+  // Jogador só recebe peça oculta se a descobriu: para ele, ela aparece normal.
+  const playerSees = view && !view.manager;
   return {
     id: r.id,
     mapId: r.mapId,
@@ -59,12 +81,23 @@ function toToken(r: typeof t.$inferSelect, portrait: string | null = null): Toke
     x: r.x,
     y: r.y,
     size: r.size,
-    hidden: r.hidden,
+    hidden: playerSees ? false : r.hidden,
     icon: (r.icon as PropKind | null) ?? null,
     state: r.state ?? null,
     rotation: r.rotation,
     imageAsset: r.imageAsset,
     image: r.imageAsset ?? portrait,
+    ...(view?.manager
+      ? {
+          secret:
+            r.secretSkill && r.secretDt
+              ? { skill: r.secretSkill, dt: r.secretDt, radius: r.secretRadius }
+              : null,
+          foundBy: view.foundBy ?? [],
+        }
+      : view?.discovered
+        ? { discovered: true }
+        : {}),
   };
 }
 
@@ -73,7 +106,57 @@ export class MapsService {
   constructor(
     @Inject(DB) private readonly db: Database,
     private readonly rt: Realtime,
+    private readonly characters: CharactersService,
   ) {}
+
+  /**
+   * "Procurar ao redor": o servidor rola a perícia do personagem (mensagem secreta, só ele e o
+   * mestre veem) e revela as peças secretas daquela perícia que estão ao alcance e cuja DT foi
+   * alcançada. Só quem rolou passa a ver o que achou.
+   */
+  async search(userId: string, cid: string, mapId: string, input: SearchAreaInput): Promise<SearchResultDto> {
+    const place = await withUser(this.db, userId, async (tx) => {
+      await requirePlayer(tx, cid);
+      const map = await this.mapOf(tx, cid, mapId);
+      if (!map.shared) throw notFound('Mapa');
+      const [tok] = await tx
+        .select({ x: t.x, y: t.y, size: t.size })
+        .from(t)
+        .where(and(eq(t.mapId, mapId), eq(t.characterId, input.characterId)));
+      if (!tok)
+        throw new AppError(
+          ERROR_CODES.VALIDATION,
+          'Coloque o token do seu personagem no mapa para procurar.',
+          400,
+        );
+      const [me] = await tx
+        .select({ name: schema.userProfiles.displayName })
+        .from(schema.userProfiles)
+        .where(eq(schema.userProfiles.userId, userId));
+      return { ...tok, by: me?.name ?? 'Jogador' };
+    });
+    // Rolagem pela regra do sistema (confere se a pessoa pode rolar por este personagem).
+    const { message } = await this.characters.check(userId, cid, input.characterId, {
+      skill: input.skill,
+      bonus: 0,
+      visibility: 'gm',
+    });
+    const total = message.roll?.total ?? 0;
+    // Gravação privilegiada: a função confere DT, perícia, alcance e mapa compartilhado.
+    const ids = (
+      await this.db.execute<{ id: string }>(
+        sql`select r as id from app_private.reveal_secrets(${mapId}::uuid, ${userId}::uuid, ${place.x}, ${place.y}, ${place.size}, ${input.skill}, ${total}) r`,
+      )
+    ).map((r) => r.id);
+    const found = ids.length
+      ? await this.db.select({ id: t.id, label: t.label }).from(t).where(inArray(t.id, ids))
+      : [];
+    if (found.length) {
+      this.rt.users([userId], WS_EVENTS.secretFound, { mapId, found, total });
+      this.rt.managers(cid, WS_EVENTS.secretFound, { mapId, found, total, by: place.by });
+    }
+    return { total, found };
+  }
 
   /** Avisa quem pode ver o mapa que ele mudou (clientes recarregam pela API). */
   private notify(cid: string, mapId: string, shared: boolean) {
@@ -120,6 +203,19 @@ export class MapsService {
       .leftJoin(schema.npcs, eq(schema.npcs.id, t.npcId))
       .where(eq(t.mapId, mapId))
       .orderBy(asc(t.createdAt));
+    // Segredos: o mestre vê quem descobriu cada um; o jogador, o que ele descobriu (RLS filtra).
+    const [mgr] = await tx.execute<{ m: boolean }>(
+      sql`select app_private.is_campaign_manager(${cid}::uuid) as m`,
+    );
+    const manager = !!mgr?.m;
+    const reveals = await tx
+      .select({ tokenId: schema.mapTokenReveals.tokenId, name: schema.userProfiles.displayName })
+      .from(schema.mapTokenReveals)
+      .innerJoin(t, eq(t.id, schema.mapTokenReveals.tokenId))
+      .leftJoin(schema.userProfiles, eq(schema.userProfiles.userId, schema.mapTokenReveals.userId))
+      .where(eq(t.mapId, mapId));
+    const foundBy = new Map<string, string[]>();
+    for (const r of reveals) foundBy.set(r.tokenId, [...(foundBy.get(r.tokenId) ?? []), r.name ?? 'Jogador']);
     return {
       id: map.id,
       campaignId: map.campaignId,
@@ -131,7 +227,13 @@ export class MapsService {
       gridVisible: map.gridVisible,
       cellLabel: map.cellLabel,
       terrain: map.terrain as Record<string, Terrain>,
-      tokens: tokens.map((r) => toToken(r.t, r.cp ?? r.np ?? null)),
+      tokens: tokens.map((r) =>
+        toToken(r.t, r.cp ?? r.np ?? null, {
+          manager,
+          foundBy: foundBy.get(r.t.id),
+          discovered: !manager && r.t.hidden && foundBy.has(r.t.id),
+        }),
+      ),
       updatedAt: map.updatedAt.toISOString(),
     };
   }
@@ -403,6 +505,17 @@ export class MapsService {
 @Controller('campaigns/:id/maps')
 export class MapsController {
   constructor(private readonly svc: MapsService) {}
+
+  @Post(':mapId/search')
+  @HttpCode(200)
+  search(
+    @CurrentUser() u: AuthUser,
+    @Param('id') id: string,
+    @Param('mapId') mapId: string,
+    @Body() body: unknown,
+  ) {
+    return this.svc.search(u.id, campaignId(id), anyId(mapId), parse(searchAreaSchema, body));
+  }
 
   @Post(':mapId/tokens/:tokenId/toggle')
   @HttpCode(200)
