@@ -5,6 +5,7 @@ import { Logo } from '@/components/brand';
 import { LiveSessionNotifier } from '@/components/live-notifier';
 import { NavLinks, SignOutButton } from '@/components/nav';
 import { PrefsMenu, Toaster } from '@/components/prefs-menu';
+import { MainContainer } from '@/components/main-container';
 import { api } from '@/lib/api';
 import { serverToken } from '@/lib/supabase-server';
 
@@ -30,9 +31,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           </div>
         </div>
       </header>
-      <main id="main" tabIndex={-1} className="outline-none mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-12">
-        {children}
-      </main>
+      <MainContainer>{children}</MainContainer>
       <LiveSessionNotifier />
       <Toaster />
     </div>

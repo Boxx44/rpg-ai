@@ -559,7 +559,7 @@ export function MapEditor({
                 <Button
                   size="sm"
                   variant="ghost"
-                  onClick={() => setZoom((z) => Math.min(2, +(z + 0.2).toFixed(1)))}
+                  onClick={() => setZoom((z) => Math.min(3, +(z + 0.2).toFixed(1)))}
                   aria-label="Aumentar zoom"
                 >
                   +
@@ -571,7 +571,7 @@ export function MapEditor({
               zoom={zoom}
               onZoomChange={setZoom}
               onDropImage={(f, target) => void placeImage(f, target)}
-              className="max-h-[70vh]"
+              className="h-[calc(100dvh-16rem)] min-h-[520px]"
               canMove={() => tool.kind === 'select'}
               onMove={onMove}
               paint={tool.kind === 'paint' ? { terrain: tool.terrain, onPaint } : undefined}

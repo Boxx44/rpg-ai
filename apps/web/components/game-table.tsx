@@ -303,25 +303,32 @@ export function GameTable({
   /** Vida, vez do turno e condições desenhadas nas peças do mapa. */
   const decorations = useMemo(() => {
     const out: Record<string, TokenDecoration> = {};
-    if (!shownCombat || !shownMap) return out;
+    if (!shownMap) return out;
     for (const t of shownMap.tokens) {
-      const c = shownCombat.combatants.find((x) =>
+      const d: TokenDecoration = {};
+      // visual do boneco 2D: classe e primeira arma da ficha
+      const ch = t.characterId ? characters.find((x) => x.id === t.characterId) : undefined;
+      const cls = ch?.sheet.system?.fields?.classe;
+      if (cls === 'combatente' || cls === 'especialista' || cls === 'ocultista') d.role = cls;
+      const w = ch?.sheet.system?.weapons?.[0];
+      if (w?.kind) d.gear = w.kind;
+      const c = shownCombat?.combatants.find((x) =>
         t.characterId
           ? x.characterId === t.characterId
           : t.npcId
             ? x.npcId === t.npcId
             : x.kind === 'enemy' && x.name === t.label,
       );
-      if (!c) continue;
-      out[t.id] = {
-        hp: c.hp ?? undefined,
-        health: c.defeated ? 'down' : c.health,
-        turn: shownCombat.currentId === c.id,
-        conditions: c.conditions.length,
-      };
+      if (c && shownCombat) {
+        d.hp = c.hp ?? undefined;
+        d.health = c.defeated ? 'down' : c.health;
+        d.turn = shownCombat.currentId === c.id;
+        d.conditions = c.conditions.length;
+      }
+      if (Object.keys(d).length) out[t.id] = d;
     }
     return out;
-  }, [shownCombat, shownMap]);
+  }, [shownCombat, shownMap, characters]);
 
   // Imagens dos combatentes (retrato ou imagem do token de mesmo nome).
   const tokenImages = useMemo(() => {
@@ -453,7 +460,7 @@ export function GameTable({
 
   const shownCharacters = asPlayer ? characters.filter((c) => c.ownerId === myId) : characters;
   return (
-    <div className="grid gap-5 max-xl:pb-20 xl:grid-cols-[1fr_400px]">
+    <div className="grid gap-5 max-xl:pb-20 xl:grid-cols-[1fr_380px] 2xl:grid-cols-[1fr_420px]">
       {/* Fora das seções: aparecem mesmo com o mapa escondido (celular). */}
       <DiceTray message={diceMsg} onDone={closeDice} />
       {banner && <CombatIntro combat={banner} images={combatImages} onDone={closeBanner} />}
@@ -548,7 +555,7 @@ export function GameTable({
               variant="ghost"
               size="icon"
               aria-label="Aumentar zoom"
-              onClick={() => setZoom((z) => Math.min(2, +(z + 0.2).toFixed(1)))}
+              onClick={() => setZoom((z) => Math.min(3, +(z + 0.2).toFixed(1)))}
             >
               <Plus />
             </Button>
@@ -593,7 +600,7 @@ export function GameTable({
                     ? `Soltar para usar como retrato de ${t?.label}`
                     : 'Solte sobre o token do seu personagem'
               }
-              className="max-h-[70vh] max-xl:max-h-[calc(100dvh-14rem)]"
+              className="h-[calc(100dvh-15rem)] min-h-[520px] max-xl:max-h-[calc(100dvh-14rem)]"
             />
           </div>
         ) : (

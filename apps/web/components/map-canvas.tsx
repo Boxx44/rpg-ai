@@ -8,9 +8,10 @@ import {
   type Terrain,
   type TokenDto,
 } from '@rpg-ai/shared';
-import { cn, GameIcon } from '@rpg-ai/ui';
+import { cn } from '@rpg-ai/ui';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { FLAT_PROPS, PROP_LIGHT, PropArt, PropDefs } from './map-props';
+import { FigureDefs, type FigureGear, type FigureRole, TokenFigure } from './token-figure';
 import { TEXTURE_CELLS, type TextureKind, useTextures } from '@/lib/textures';
 import { draggingFiles, imageFrom, useAssetUrls } from '@/lib/assets';
 import { prefersLessMotion } from '@/lib/feedback';
@@ -74,6 +75,10 @@ export interface TokenDecoration {
   health?: 'ok' | 'hurt' | 'down';
   turn?: boolean;
   conditions?: number;
+  /** Classe do personagem (muda o equipamento do boneco). */
+  role?: FigureRole;
+  /** Primeira arma da ficha: corpo a corpo ou à distância. */
+  gear?: FigureGear;
 }
 
 export interface MapCanvasProps {
@@ -95,19 +100,13 @@ export interface MapCanvasProps {
    * (ou null = fundo do mapa). Sem esta função, o mapa não aceita imagens.
    */
   onDropImage?: (file: File, target: TokenDto | null) => void;
+  /** Abrir já ajustado à largura disponível (padrão: sim). */
+  autoFit?: boolean;
   /** Texto do aviso ao arrastar sobre o fundo / sobre uma peça. */
   dropHint?: (target: TokenDto | null) => string;
   /** Pinça com dois dedos e botão "ajustar à tela" mudam o zoom. */
   onZoomChange?: (z: number) => void;
   className?: string;
-}
-
-function initials(label: string) {
-  // só palavras com letra: "Arthur (exemplo)" vira "AE", não "A("
-  return (label.match(/\p{L}[\p{L}\p{N}'-]*/gu) ?? [label])
-    .slice(0, 2)
-    .map((p) => p[0]!.toUpperCase())
-    .join('');
 }
 
 const isProp = (t: TokenDto) => t.kind === 'object' && !!t.icon;
@@ -151,6 +150,7 @@ export function MapCanvas({
   onZoomChange,
   onDropImage,
   dropHint,
+  autoFit = true,
   className,
 }: MapCanvasProps) {
   /** Arrastando um arquivo de imagem por cima do mapa: mostra onde vai cair. */
@@ -342,16 +342,37 @@ export function MapCanvas({
     } else onCellClick?.(x, y);
   }
 
-  /** Zoom para o mapa caber na largura disponível. */
+  /**
+   * Zoom para o mapa ocupar o maior tamanho possível cabendo inteiro no espaço
+   * (amplia mapas pequenos, reduz os grandes).
+   */
   const fit = useCallback(() => {
-    const w = wrapRef.current?.clientWidth;
-    if (!w || !onZoomChange) return;
-    onZoomChange(clampZoom(Math.min(2, (w - 2) / (map.cols * CELL))));
-  }, [map.cols, onZoomChange]);
-  // Em telas de toque, o mapa já abre cabendo na tela.
+    const el = wrapRef.current;
+    if (!el || !onZoomChange) return;
+    const zw = (el.clientWidth - 2) / (map.cols * CELL);
+    const zh = el.clientHeight > 80 ? (el.clientHeight - 2) / (map.rows * CELL) : zw;
+    onZoomChange(clampZoom(Math.min(3, zw, zh)));
+  }, [map.cols, map.rows, onZoomChange]);
+  // O mapa já abre grande, preenchendo o espaço (a não ser que autoFit=false).
   useEffect(() => {
-    if (typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)').matches) fit();
-  }, [map.id, fit]);
+    if (autoFit) fit();
+  }, [map.id, fit, autoFit]);
+
+  /** Tela cheia: o mapa ocupa o monitor inteiro (Esc sai). */
+  const outerRef = useRef<HTMLDivElement>(null);
+  const [full, setFull] = useState(false);
+  useEffect(() => {
+    const h = () => {
+      setFull(document.fullscreenElement === outerRef.current);
+      requestAnimationFrame(() => fit());
+    };
+    document.addEventListener('fullscreenchange', h);
+    return () => document.removeEventListener('fullscreenchange', h);
+  }, [fit]);
+  const toggleFull = () => {
+    if (document.fullscreenElement) void document.exitFullscreen();
+    else void outerRef.current?.requestFullscreen?.().catch(() => undefined);
+  };
 
   /** Teclado: setas movem a peça, Enter/Espaço usa o objeto. */
   function onTokenKey(e: React.KeyboardEvent, t: TokenDto) {
@@ -384,7 +405,8 @@ export function MapCanvas({
   const W = map.cols * CELL;
   const H = map.rows * CELL;
   const props = map.tokens.filter(isProp);
-  const pieces = map.tokens.filter((t) => !isProp(t));
+  // quem está mais embaixo no mapa é desenhado por cima (a cabeça de quem está atrás fica atrás)
+  const pieces = map.tokens.filter((t) => !isProp(t)).sort((a, b) => a.y - b.y || a.x - b.x);
   const lights = props.filter((t) => {
     const l = PROP_LIGHT[t.icon!];
     return l && t.state === l.when;
@@ -393,7 +415,9 @@ export function MapCanvas({
 
   return (
     <div
-      className="relative"
+      ref={outerRef}
+      data-fullscreen={full ? 'true' : undefined}
+      className={cn('relative', full && 'bg-[#0d0b12] p-2')}
       onDragOver={
         onDropImage
           ? (e) => {
@@ -429,6 +453,7 @@ export function MapCanvas({
         className={cn(
           'relative overflow-auto overscroll-contain rounded-xl border border-line bg-[#0d0b12]',
           className,
+          full && '!h-[calc(100vh-1rem)] !max-h-none',
         )}
       >
         <svg
@@ -476,6 +501,7 @@ export function MapCanvas({
               <feDropShadow dx="2" dy="3" stdDeviation="2" floodColor="#000" floodOpacity="0.55" />
             </filter>
             <PropDefs />
+            <FigureDefs />
             <pattern id="p-floor" width="40" height="40" patternUnits="userSpaceOnUse">
               <rect width="40" height="40" fill="#2a2433" />
               <path d="M0 0H40V40" fill="none" stroke="rgba(0,0,0,0.25)" />
@@ -848,9 +874,6 @@ export function MapCanvas({
             const down = deco?.health === 'down' || (deco?.hp ? deco.hp.current <= 0 : false);
             const hpPct =
               deco?.hp && deco.hp.max > 0 ? Math.max(0, Math.min(1, deco.hp.current / deco.hp.max)) : null;
-            const ringR = r - 2;
-            const circ = 2 * Math.PI * ringR;
-            const ring = t.kind === 'enemy' ? '#b4232f' : t.kind === 'npc' ? '#c9a24b' : '#7c4ff0';
             return (
               <g
                 key={t.id}
@@ -875,107 +898,42 @@ export function MapCanvas({
                 onPointerLeave={() => setHover(null)}
               >
                 <title>{t.label}</title>
-                {/* sombra no chão */}
-                <ellipse cx={r} cy={r * 1.72} rx={r * 0.62} ry={r * 0.18} fill="rgba(0,0,0,0.45)" />
-                {deco?.turn && (
-                  <circle
-                    cx={r}
-                    cy={r}
-                    r={r - 1}
-                    fill="none"
-                    stroke="#e6c87f"
-                    strokeWidth={3}
-                    className="animate-ring-pulse"
-                    style={{ transformOrigin: 'center', transformBox: 'fill-box' }}
-                  />
-                )}
+                {/* boneco 2D (ou cartão com o retrato), levantando ao ser arrastado */}
                 <g
-                  className={cn(dragging && 'drop-shadow-[0_8px_8px_rgba(0,0,0,0.6)]')}
                   style={{
-                    transform: dragging ? 'scale(1.08)' : undefined,
+                    transform: dragging ? 'translateY(-6px) scale(1.08)' : undefined,
                     transformOrigin: 'center',
                     transformBox: 'fill-box',
                     transition: 'transform .15s',
                   }}
                 >
-                  <circle
-                    cx={r}
-                    cy={r}
-                    r={r - 4}
-                    fill={t.color}
-                    stroke={selected ? '#e6c87f' : 'rgba(0,0,0,0.6)'}
-                    strokeWidth={selected ? 3 : 2}
-                    strokeDasharray={t.hidden ? '4 3' : undefined}
-                    filter={down ? 'grayscale(1)' : undefined}
-                    opacity={down ? 0.55 : 1}
-                  />
-                  {t.image && urls[t.image] ? (
-                    <>
-                      <clipPath id={`clip-tok-${t.id}`}>
-                        <circle cx={r} cy={r} r={r - 4} />
-                      </clipPath>
-                      <image
-                        href={urls[t.image]}
-                        x={4}
-                        y={4}
-                        width={2 * r - 8}
-                        height={2 * r - 8}
-                        preserveAspectRatio="xMidYMid slice"
-                        clipPath={`url(#clip-tok-${t.id})`}
-                        pointerEvents="none"
-                        opacity={down ? 0.45 : 1}
-                        style={down ? { filter: 'grayscale(1)' } : undefined}
-                        data-testid="token-image"
-                      />
-                    </>
-                  ) : (
-                    <circle cx={r} cy={r} r={r - 4} fill="url(#g-token)" pointerEvents="none" />
-                  )}
-                  {/* anel de vida */}
-                  <circle cx={r} cy={r} r={ringR} fill="none" stroke="rgba(0,0,0,0.5)" strokeWidth={3} />
-                  <circle
-                    cx={r}
-                    cy={r}
-                    r={ringR}
-                    fill="none"
-                    stroke={
-                      hpPct === null ? ring : hpPct > 0.5 ? '#22c55e' : hpPct > 0 ? '#f59e0b' : '#b4232f'
-                    }
-                    strokeWidth={3}
-                    strokeDasharray={hpPct === null ? undefined : `${circ * hpPct} ${circ}`}
-                    transform={`rotate(-90 ${r} ${r})`}
-                    style={{ transition: 'stroke-dasharray .5s ease' }}
-                  />
-                  <g transform={`translate(${2 * r - 16}, 2) scale(0.5)`} pointerEvents="none">
-                    <circle cx="12" cy="12" r="12" fill="#09080d" stroke="rgba(201,162,75,.5)" />
-                    <g transform="translate(3 3) scale(0.75)">
-                      <GameIcon name={t.kind} size={24} />
-                    </g>
+                  <g transform={`scale(${(2 * r) / 100})`}>
+                    <TokenFigure
+                      token={t}
+                      portrait={t.image ? urls[t.image] : undefined}
+                      role={deco?.role ?? null}
+                      gear={deco?.gear ?? null}
+                      down={down}
+                      selected={selected}
+                      turn={!!deco?.turn}
+                      hpPct={hpPct}
+                    />
                   </g>
-                  {!(t.image && urls[t.image]) && (
-                    <text
-                      x={r}
-                      y={r + 5 * t.size}
-                      textAnchor="middle"
-                      fontSize={13 * t.size}
-                      fontWeight={700}
-                      fill="white"
-                      pointerEvents="none"
-                      style={{ fontFamily: 'var(--font-display)' }}
-                    >
-                      {initials(t.label)}
-                    </text>
-                  )}
-                  {down && (
-                    <path
-                      d={`M${r - 8} ${r - 8} L${r + 8} ${r + 8} M${r + 8} ${r - 8} L${r - 8} ${r + 8}`}
-                      stroke="#f08a92"
-                      strokeWidth={3}
-                      strokeLinecap="round"
+                  {t.hidden && (
+                    <rect
+                      x={1}
+                      y={1}
+                      width={2 * r - 2}
+                      height={2 * r - 2}
+                      rx={6}
+                      fill="none"
+                      stroke="#e6c87f"
+                      strokeDasharray="4 3"
+                      strokeOpacity="0.7"
                     />
                   )}
                   {!!deco?.conditions && (
-                    <g transform={`translate(2, ${2 * r - 14})`}>
+                    <g transform={`translate(2, ${2 * r - 16})`}>
                       <circle cx="6" cy="6" r="6" fill="#4c23a8" stroke="#d6c4ff" />
                       <text x="6" y="9" textAnchor="middle" fontSize="8" fill="white" fontWeight={700}>
                         {deco.conditions}
@@ -1049,14 +1007,41 @@ export function MapCanvas({
         )}
       </div>
       {onZoomChange && (
-        <button
-          type="button"
-          onClick={fit}
-          className="absolute bottom-2 right-2 rounded-md border border-line bg-bg/85 px-2.5 py-1.5 text-xs text-ink-muted backdrop-blur hover:text-ink"
-          data-testid="map-fit"
-        >
-          Ajustar à tela
-        </button>
+        <div className="absolute bottom-3 right-3 z-10 flex gap-1.5">
+          <button
+            type="button"
+            onClick={() => onZoomChange(clampZoom(zoom - 0.25))}
+            aria-label="Diminuir o mapa"
+            className="rounded-md border border-line bg-bg/85 px-2.5 py-1.5 text-sm text-ink-muted backdrop-blur hover:text-ink"
+          >
+            −
+          </button>
+          <button
+            type="button"
+            onClick={() => onZoomChange(clampZoom(zoom + 0.25))}
+            aria-label="Aumentar o mapa"
+            className="rounded-md border border-line bg-bg/85 px-2.5 py-1.5 text-sm text-ink-muted backdrop-blur hover:text-ink"
+          >
+            +
+          </button>
+          <button
+            type="button"
+            onClick={fit}
+            className="rounded-md border border-line bg-bg/85 px-2.5 py-1.5 text-xs text-ink-muted backdrop-blur hover:text-ink"
+            data-testid="map-fit"
+          >
+            Ajustar à tela
+          </button>
+          <button
+            type="button"
+            onClick={toggleFull}
+            className="rounded-md border border-gold/40 bg-bg/85 px-2.5 py-1.5 text-xs text-gold-bright backdrop-blur hover:border-gold"
+            data-testid="map-fullscreen"
+            aria-pressed={full}
+          >
+            {full ? 'Sair da tela cheia' : 'Tela cheia'}
+          </button>
+        </div>
       )}
     </div>
   );
