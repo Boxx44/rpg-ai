@@ -44,6 +44,7 @@ export function ImagePicker({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string>();
   const [over, setOver] = useState(false);
+  const [cutout, setCutout] = useState(true);
   const [gallery, setGallery] = useState<AssetDto[] | null>(null);
 
   async function send(file: File | undefined) {
@@ -51,7 +52,7 @@ export function ImagePicker({
     setBusy(true);
     setError(undefined);
     try {
-      const a = await uploadAsset(campaignId, kind, file);
+      const a = await uploadAsset(campaignId, kind, file, { cutout: kind !== 'map' && cutout });
       onUploaded?.(a);
       await onChange(a.id);
       playSound('notify');
@@ -136,6 +137,12 @@ export function ImagePicker({
           )}
         </div>
       </div>
+      {kind !== 'map' && (
+        <label className="flex items-center gap-2 text-xs text-ink-muted">
+          <input type="checkbox" checked={cutout} onChange={(e) => setCutout(e.target.checked)} />
+          Remover fundo liso (arte de corpo inteiro vira figura recortada que respira no mapa)
+        </label>
+      )}
       <p className="text-xs text-ink-faint">
         Ou arraste a imagem para cá. PNG, JPG ou WebP; o site reduz o tamanho sozinho.
       </p>

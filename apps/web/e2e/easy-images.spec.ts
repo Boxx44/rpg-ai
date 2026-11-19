@@ -110,6 +110,29 @@ test('fundo pelo botão da barra, por arrastar e por Ctrl+V; imagem arrastada pa
   await expect(page.getByTestId('token-image')).toHaveCount(1);
   await expect(page.getByTestId('drop-overlay')).toHaveCount(0);
 
+  // 2b) arte de corpo inteiro com fundo branco: o fundo some e vira figura recortada que respira
+  const dtFig = await page.evaluateHandle(async () => {
+    const c = document.createElement('canvas');
+    c.width = 120;
+    c.height = 160;
+    const g = c.getContext('2d')!;
+    g.fillStyle = '#ffffff';
+    g.fillRect(0, 0, 120, 160);
+    g.fillStyle = '#2a2233';
+    g.beginPath();
+    g.arc(60, 35, 20, 0, Math.PI * 2);
+    g.fill();
+    g.fillRect(35, 55, 50, 95);
+    const blob = await new Promise<Blob>((r) => c.toBlob((b) => r(b!), 'image/png'));
+    const dt = new DataTransfer();
+    dt.items.add(new File([blob], 'figura.png', { type: 'image/png' }));
+    return dt;
+  });
+  await wrap.dispatchEvent('dragover', { dataTransfer: dtFig, ...on });
+  await wrap.dispatchEvent('drop', { dataTransfer: dtFig, ...on });
+  await expect(token.locator('[data-cutout="true"]')).toHaveCount(1, { timeout: 10_000 });
+  await expect(token.locator('[data-figure="cutout"]')).toHaveCount(1);
+
   // 3) arrastar para um lugar vazio troca o fundo
   const e400 = (await mapPoint(canvas))(400, 400);
   const empty = { clientX: e400.x, clientY: e400.y };
