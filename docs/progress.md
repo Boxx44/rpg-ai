@@ -22,6 +22,16 @@
 
 ---
 
+## 23/11/2026 — Clicar no personagem para ver e mudar a aparência
+
+- Na mesa, ao clicar no token de um personagem, aparece um cartão com o nome e a aparência dele, respirando.
+- **"Mudar aparência"** abre o criador ali mesmo. Esse botão só aparece para o dono do personagem e para o mestre.
+- Ao salvar, todos na mesa veem o visual novo na hora. "Ver ficha" abre a ficha no painel lateral.
+- O visual sorteado (de quem ainda não escolheu) agora é o mesmo no mapa e na aba Aparência.
+- Servidor mantido acordado: o GitHub Actions chama `/health` a cada 10 min (`keep-awake.yml`).
+
+**Testes:** 54 de ponta a ponta, com o novo fluxo de clicar, mudar e conferir no mapa do mestre. Unidade, lint e tipos passando.
+
 ## 19/11/2026 — Criador de personagem em pixel art
 
 **O que funciona (testado):**
