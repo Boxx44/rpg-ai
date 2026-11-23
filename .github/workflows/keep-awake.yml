@@ -1,0 +1,26 @@
+# Mantém o servidor do jogo (Render, plano gratuito) acordado: ele "dorme" após 15 min sem
+# visitas e demora ~1 min para voltar. A cada 10 min chamamos /health, que também consulta o
+# banco (Supabase), mantendo-o ativo. Usa ~730 das 750 horas gratuitas mensais do Render.
+name: Manter servidor acordado
+
+on:
+  schedule:
+    - cron: '*/10 * * * *'
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Chamar /health
+        run: |
+          for i in 1 2 3; do
+            code=$(curl -s -o /tmp/out -w '%{http_code}' -m 90 https://rpg-ai-api.onrender.com/health || echo 000)
+            echo "tentativa $i: HTTP $code $(cat /tmp/out 2>/dev/null)"
+            [ "$code" = "200" ] && exit 0
+            sleep 20
+          done
+          echo "::warning::Servidor não respondeu 200 (pode estar acordando ou com o banco fora)."
