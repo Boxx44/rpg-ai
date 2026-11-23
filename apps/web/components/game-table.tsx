@@ -33,6 +33,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { api, json } from '@/lib/api';
 import { useCampaignRealtime } from '@/lib/realtime';
 import { accessToken } from '@/lib/supabase';
+import { CharacterLookCard } from './character-look-card';
 import { ChatPanel } from './chat-panel';
 import { CombatIntro, InitiativeBar, useCombatImages } from './combat-stage';
 import { DiceTray, rollOutcome } from './dice-tray';
@@ -499,6 +500,11 @@ export function GameTable({
   });
 
   const shownCharacters = asPlayer ? characters.filter((c) => c.ownerId === myId) : characters;
+  /** Personagem do token clicado (para o cartão de aparência). */
+  const focusedTok = shownMap?.tokens.find((t) => t.id === focusToken);
+  const focusedChar = focusedTok?.characterId
+    ? characters.find((c) => c.id === focusedTok.characterId)
+    : undefined;
   return (
     <div className="grid gap-5 max-xl:pb-20 xl:grid-cols-[1fr_380px] 2xl:grid-cols-[1fr_420px]">
       {/* Fora das seções: aparecem mesmo com o mapa escondido (celular). */}
@@ -653,6 +659,26 @@ export function GameTable({
               }
               className="h-[calc(100dvh-15rem)] min-h-[520px] max-xl:max-h-[calc(100dvh-14rem)]"
             />
+            {focusedChar && (
+              <CharacterLookCard
+                key={focusedChar.id}
+                campaignId={campaignId}
+                character={focusedChar}
+                canEdit={myRole !== 'spectator' && (manager || focusedChar.ownerId === myId)}
+                onClose={() => setFocusToken(null)}
+                onSaved={(c) => {
+                  setCharacters((list) => list.map((x) => (x.id === c.id ? c : x)));
+                  toast('Aparência atualizada', {
+                    body: 'Todos na mesa já veem o visual novo.',
+                    tone: 'success',
+                  });
+                }}
+                onOpenSheet={() => {
+                  setTab('sheet');
+                  setView('panel');
+                }}
+              />
+            )}
           </div>
         ) : (
           <div className="flex min-h-[360px] flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-line p-8 text-center">

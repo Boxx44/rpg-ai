@@ -306,7 +306,8 @@ function figureAppearance(
   chosen?: Appearance | null,
 ): Appearance | null {
   if (chosen) return chosen;
-  const seed = token.id + token.label;
+  // mesma semente da ficha: o visual sorteado é igual no mapa e na aba Aparência
+  const seed = token.characterId ?? token.id + token.label;
   if (token.kind === 'enemy') {
     const look = enemyLook(token.label, hash(seed));
     if (look === 'zombie')
@@ -361,7 +362,8 @@ function pixelLook(
   chosen?: Appearance | null,
 ): PixelLook | null {
   if (chosen?.pixel) return chosen.pixel;
-  const seed = token.id + token.label;
+  // mesma semente da ficha: o visual sorteado é igual no mapa e na aba Aparência
+  const seed = token.characterId ?? token.id + token.label;
   const part = (id: string, color: string[] = []) => ({ id, color });
   if (token.kind === 'enemy') {
     const look = enemyLook(token.label, hash(seed));

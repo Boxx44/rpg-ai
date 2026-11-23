@@ -147,6 +147,24 @@ test('jogador vê o mapa ao vivo, sem o inimigo oculto, e move o próprio token'
   // O mestre recebe o movimento em tempo real
   await expect(gmPage.locator('[data-label="Lyra"]')).toHaveAttribute('data-x', '4');
   await expect(gmPage.locator('[data-label="Lyra"]')).toHaveAttribute('data-y', '3');
+
+  // Clicar no personagem mostra a aparência; o dono muda ali mesmo e todos veem
+  await plTokens.first().click();
+  const card = plPage.getByTestId('character-card');
+  await expect(card).toContainText('Lyra');
+  await expect(card.getByTestId('character-card-look')).toBeVisible();
+  await card.getByTestId('change-look').click();
+  const dlg = plPage.getByRole('dialog', { name: 'Aparência de Lyra' });
+  await dlg.getByRole('tab', { name: 'Cabelo' }).click();
+  await dlg.getByRole('radio', { name: 'Black power', exact: true }).click();
+  await expect(dlg.getByTestId('appearance-preview')).toHaveAttribute('data-pixel', /hair_afro\b/);
+  await dlg.getByTestId('save-look').click();
+  await expect(dlg).toHaveCount(0);
+  await expect(plTokens.first().locator('image[data-pixel]')).toHaveAttribute('data-pixel', /hair_afro\b/);
+  await expect(gmPage.locator('[data-label="Lyra"] image[data-pixel]')).toHaveAttribute('data-pixel', /hair_afro\b/);
+  await plPage.screenshot({ path: 'test-results/screens/character-card.png' });
+  await card.getByRole('button', { name: 'Fechar' }).click();
+  await expect(card).toHaveCount(0);
 });
 
 test('rolagens e chat em tempo real, com segredo do mestre', async () => {
